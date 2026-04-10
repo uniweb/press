@@ -1,0 +1,52 @@
+{
+    "name": "@uniweb/documents",
+    "version": "0.1.0",
+    "description": "Frontend document generation (Word, Excel, PDF) for Uniweb foundations",
+    "type": "module",
+    "exports": {
+        ".": "./src/index.js",
+        "./react": "./src/react/index.js",
+        "./docx": "./src/docx/index.js"
+    },
+    "files": [
+        "src"
+    ],
+    "keywords": [
+        "uniweb",
+        "documents",
+        "docx",
+        "report",
+        "word",
+        "react"
+    ],
+    "author": "Proximify",
+    "license": "Apache-2.0",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/uniweb/documents.git"
+    },
+    "homepage": "https://github.com/uniweb/documents#readme",
+    "bugs": {
+        "url": "https://github.com/uniweb/documents/issues"
+    },
+    "engines": {
+        "node": ">=20.19"
+    },
+    "scripts": {
+        "test": "vitest run",
+        "test:watch": "vitest"
+    },
+    "dependencies": {
+        "docx": "^9.0.0",
+        "parse5": "^7.2.0"
+    },
+    "peerDependencies": {
+        "react": "^18.0.0 || ^19.0.0",
+        "react-dom": "^18.0.0 || ^19.0.0"
+    },
+    "devDependencies": {
+        "@testing-library/react": "^16.0.0",
+        "jsdom": "^25.0.0",
+        "vitest": "^2.0.0"
+    }
+}
