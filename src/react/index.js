@@ -15,7 +15,22 @@ export { DocumentContext } from './DocumentContext.js'
 export { default as DownloadButton } from './DownloadButton.jsx'
 
 // Builder components
-export { Paragraph, TextRun, H1, H2, H3, H4, Section } from './components/index.js'
+export {
+    Paragraph,
+    Paragraphs,
+    TextRun,
+    H1,
+    H2,
+    H3,
+    H4,
+    Section,
+    Image,
+    Images,
+    Link,
+    Links,
+    List,
+    Lists,
+} from './components/index.js'
 
 // Orchestrator (for advanced use — most consumers use DownloadButton)
 export { compileOutputs } from '../orchestrator/compile.js'

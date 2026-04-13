@@ -146,7 +146,7 @@ describe('compileOutputs for docx', () => {
         )
 
         const compiled = compileOutputs(store, 'docx')
-        const doc = buildDocument(compiled)
+        const doc = await buildDocument(compiled)
         const buffer = await Packer.toBuffer(doc)
 
         expect(buffer[0]).toBe(0x50)

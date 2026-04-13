@@ -2,12 +2,36 @@
  * Heading components (H1–H4). Each renders the corresponding HTML heading
  * element with data-type="paragraph" and data-heading="HEADING_N".
  *
+ * Supports the `data` prop for styled string parsing (same as Paragraph).
+ *
  * Maps to the `paragraph` IR node type with a `heading` property → docx
  * Paragraph with HeadingLevel.
  */
+import { parseStyledString } from '../../sdk/parseStyledString.js'
+import TextRun from './TextRun.jsx'
 
-function Heading({ level, children, ...props }) {
+function Heading({ level, data, children, ...props }) {
     const Tag = `h${level}`
+
+    if (data) {
+        const parts = parseStyledString(data)
+
+        return (
+            <Tag data-type="paragraph" data-heading={`HEADING_${level}`} {...props}>
+                {parts.map((part, i) => (
+                    <TextRun
+                        key={i}
+                        bold={part.bold}
+                        italics={part.italics}
+                        underline={!!part.underline}
+                    >
+                        {part.content}
+                    </TextRun>
+                ))}
+            </Tag>
+        )
+    }
+
     return (
         <Tag data-type="paragraph" data-heading={`HEADING_${level}`} {...props}>
             {children}

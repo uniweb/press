@@ -7,7 +7,7 @@ import { htmlToIR } from '../../src/ir/parser.js'
  * Helper: parse HTML, wrap in a single-section walker-output shape,
  * and build a Document.
  */
-function buildFromHtml(html) {
+async function buildFromHtml(html) {
     const ir = htmlToIR(html)
     return buildDocument({ sections: [ir] })
 }
@@ -21,7 +21,7 @@ async function toBuffer(doc) {
 
 describe('buildDocument', () => {
     it('creates a Document from minimal IR', async () => {
-        const doc = buildDocument({
+        const doc = await buildDocument({
             sections: [[{ type: 'paragraph', children: [{ type: 'text', content: 'Hello' }] }]],
         })
         expect(doc).toBeDefined()
@@ -31,22 +31,22 @@ describe('buildDocument', () => {
         expect(buffer.length).toBeGreaterThan(0)
     })
 
-    it('handles empty sections gracefully', () => {
-        const doc = buildDocument({ sections: [] })
+    it('handles empty sections gracefully', async () => {
+        const doc = await buildDocument({ sections: [] })
         expect(doc).toBeDefined()
     })
 
-    it('flattens multiple block IR arrays into one section', () => {
+    it('flattens multiple block IR arrays into one section', async () => {
         const block1 = [{ type: 'paragraph', children: [{ type: 'text', content: 'Block 1' }] }]
         const block2 = [{ type: 'paragraph', children: [{ type: 'text', content: 'Block 2' }] }]
-        const doc = buildDocument({ sections: [block1, block2] })
+        const doc = await buildDocument({ sections: [block1, block2] })
         expect(doc).toBeDefined()
     })
 })
 
 describe('end-to-end: HTML → IR → docx buffer', () => {
     it('produces a valid docx buffer from a simple paragraph', async () => {
-        const doc = buildFromHtml('<p data-type="paragraph">Hello world</p>')
+        const doc = await buildFromHtml('<p data-type="paragraph">Hello world</p>')
         const buffer = await toBuffer(doc)
         expect(buffer).toBeInstanceOf(Buffer)
         expect(buffer.length).toBeGreaterThan(0)
@@ -56,7 +56,7 @@ describe('end-to-end: HTML → IR → docx buffer', () => {
     })
 
     it('produces a valid docx from a heading', async () => {
-        const doc = buildFromHtml(
+        const doc = await buildFromHtml(
             '<h1 data-type="paragraph" data-heading="HEADING_1">Report Title</h1>',
         )
         const buffer = await toBuffer(doc)
@@ -72,7 +72,7 @@ describe('end-to-end: HTML → IR → docx buffer', () => {
                 <span data-type="text" data-underline="true">Underlined</span>
             </p>
         `
-        const doc = buildFromHtml(html)
+        const doc = await buildFromHtml(html)
         const buffer = await toBuffer(doc)
         expect(buffer.length).toBeGreaterThan(0)
     })
@@ -92,7 +92,7 @@ describe('end-to-end: HTML → IR → docx buffer', () => {
                 </div>
             </div>
         `
-        const doc = buildFromHtml(html)
+        const doc = await buildFromHtml(html)
         const buffer = await toBuffer(doc)
         expect(buffer.length).toBeGreaterThan(0)
         expect(buffer[0]).toBe(0x50)
@@ -106,7 +106,7 @@ describe('end-to-end: HTML → IR → docx buffer', () => {
                 </a>
             </p>
         `
-        const doc = buildFromHtml(html)
+        const doc = await buildFromHtml(html)
         const buffer = await toBuffer(doc)
         expect(buffer.length).toBeGreaterThan(0)
     })
@@ -117,7 +117,7 @@ describe('end-to-end: HTML → IR → docx buffer', () => {
             <p data-type="paragraph" data-bullet-level="0">Second item</p>
             <p data-type="paragraph" data-bullet-level="1">Sub-item</p>
         `
-        const doc = buildFromHtml(html)
+        const doc = await buildFromHtml(html)
         const buffer = await toBuffer(doc)
         expect(buffer.length).toBeGreaterThan(0)
     })
@@ -128,7 +128,7 @@ describe('end-to-end: HTML → IR → docx buffer', () => {
                 Spaced paragraph
             </p>
         `
-        const doc = buildFromHtml(html)
+        const doc = await buildFromHtml(html)
         const buffer = await toBuffer(doc)
         expect(buffer.length).toBeGreaterThan(0)
     })
@@ -160,7 +160,7 @@ describe('end-to-end: HTML → IR → docx buffer', () => {
                 </div>
             </div>
         `
-        const doc = buildFromHtml(html)
+        const doc = await buildFromHtml(html)
         const buffer = await toBuffer(doc)
         expect(buffer.length).toBeGreaterThan(0)
         expect(buffer[0]).toBe(0x50)
@@ -171,7 +171,7 @@ describe('header and footer', () => {
     it('includes header when provided', async () => {
         const headerIR = htmlToIR('<p data-type="paragraph">Header text</p>')
         const bodyIR = htmlToIR('<p data-type="paragraph">Body text</p>')
-        const doc = buildDocument({
+        const doc = await buildDocument({
             sections: [bodyIR],
             header: headerIR,
         })
@@ -182,7 +182,7 @@ describe('header and footer', () => {
     it('includes footer when provided', async () => {
         const footerIR = htmlToIR('<p data-type="paragraph">Page footer</p>')
         const bodyIR = htmlToIR('<p data-type="paragraph">Body text</p>')
-        const doc = buildDocument({
+        const doc = await buildDocument({
             sections: [bodyIR],
             footer: footerIR,
         })
@@ -204,5 +204,49 @@ describe('compileDocx', () => {
             // Blob (browser / jsdom)
             expect(result.size).toBeGreaterThan(0)
         }
+    })
+})
+
+describe('page numbering', () => {
+    it('replaces _currentPage and _totalPages with PageNumber tokens', async () => {
+        const ir = [
+            {
+                type: 'paragraph',
+                children: [
+                    { type: 'text', content: 'Page ' },
+                    { type: 'text', content: '_currentPage' },
+                    { type: 'text', content: ' of ' },
+                    { type: 'text', content: '_totalPages' },
+                ],
+            },
+        ]
+
+        const doc = await buildDocument({ sections: [ir] })
+        const buffer = await Packer.toBuffer(doc)
+        expect(buffer[0]).toBe(0x50)
+        expect(buffer.length).toBeGreaterThan(4000)
+    })
+})
+
+describe('default headers/footers', () => {
+    it('includes default "Page X of Y" when no header/footer provided', async () => {
+        const ir = htmlToIR('<p data-type="paragraph">Content</p>')
+        const doc = await buildDocument({ sections: [ir] })
+        const buffer = await Packer.toBuffer(doc)
+        expect(buffer[0]).toBe(0x50)
+        expect(buffer.length).toBeGreaterThan(4000)
+    })
+
+    it('supports firstPageOnly header', async () => {
+        const headerIR = [{ type: 'paragraph', children: [{ type: 'text', content: 'First Page Only' }] }]
+        const bodyIR = htmlToIR('<p data-type="paragraph">Body</p>')
+        const doc = await buildDocument({
+            sections: [bodyIR],
+            header: headerIR,
+            headerFirstPageOnly: true,
+        })
+        const buffer = await Packer.toBuffer(doc)
+        expect(buffer[0]).toBe(0x50)
+        expect(buffer.length).toBeGreaterThan(4000)
     })
 })

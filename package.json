@@ -6,6 +6,7 @@
     "exports": {
         ".": "./src/index.js",
         "./react": "./src/react/index.js",
+        "./sdk": "./src/sdk/index.js",
         "./docx": "./src/docx/index.js"
     },
     "files": [

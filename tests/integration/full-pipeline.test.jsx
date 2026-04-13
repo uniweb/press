@@ -191,7 +191,7 @@ describe('full pipeline integration', () => {
         })
 
         // Step 4: Build the docx Document and pack to buffer
-        const doc = buildDocument({ sections: irSections })
+        const doc = await buildDocument({ sections: irSections })
         const buffer = await Packer.toBuffer(doc)
 
         // Step 5: Verify the output
@@ -319,7 +319,7 @@ describe('full pipeline integration', () => {
             htmlToIR(renderToStaticMarkup(fragment)),
         )
 
-        const doc = buildDocument({
+        const doc = await buildDocument({
             sections: bodySections,
             header: headerIR,
         })

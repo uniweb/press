@@ -8,8 +8,8 @@
  *
  * Entry point: `compileDocx(walkerOutput, options)` → `Promise<Blob>`
  *
- * Images are deferred to a follow-up — text/table/heading/hyperlink
- * support is complete.
+ * Supports: Paragraph, TextRun, Table, Headings, Hyperlinks,
+ * PositionalTab, Images (async), page numbering, default headers/footers.
  */
 
 import {
@@ -21,6 +21,7 @@ import {
     TableCell,
     ExternalHyperlink,
     InternalHyperlink,
+    ImageRun,
     Packer,
     Header,
     Footer,
@@ -32,6 +33,9 @@ import {
     PositionalTabAlignment,
     PositionalTabLeader,
     PositionalTabRelativeTo,
+    AlignmentType,
+    PageNumber,
+    NumberFormat,
 } from 'docx'
 
 // ============================================================================
@@ -50,7 +54,7 @@ import {
  * @returns {Promise<Blob>}
  */
 export async function compileDocx(input, options = {}) {
-    const doc = buildDocument(input, options)
+    const doc = await buildDocument(input, options)
     return Packer.toBlob(doc)
 }
 
@@ -59,33 +63,63 @@ export async function compileDocx(input, options = {}) {
  * callers that need a Buffer (Node) or need to inspect the tree can use
  * this + `Packer.toBuffer(doc)`.
  *
+ * Now async because image IR nodes require fetching image data.
+ *
  * @param {Object} input
  * @param {Object} [options]
- * @returns {Document}
+ * @returns {Promise<Document>}
  */
-export function buildDocument(input, options = {}) {
-    const { sections = [], header = null, footer = null } = input
+export async function buildDocument(input, options = {}) {
+    const {
+        sections = [],
+        header = null,
+        footer = null,
+        headerFirstPageOnly = false,
+        footerFirstPageOnly = false,
+    } = input
 
     // Flatten all blocks' IR trees into one array of section children.
-    const children = sections.flat().flatMap(irToSectionChildren)
+    // Use async conversion for image support.
+    const children = await convertChildren(sections.flat())
 
     const sectionOptions = {
-        properties: { type: SectionType.CONTINUOUS },
+        properties: {
+            type: SectionType.CONTINUOUS,
+            page: { pageNumbers: { start: 1, formatType: NumberFormat.DECIMAL } },
+        },
         children,
     }
 
     if (header) {
-        const headerChildren = header.flatMap(irToSectionChildren)
-        sectionOptions.headers = {
-            default: new Header({ children: headerChildren }),
+        const headerChildren = await convertChildren(header)
+        const headerObj = new Header({ children: headerChildren })
+        const defaultHeaderObj = createDefaultHeaderFooter(true)
+
+        if (headerFirstPageOnly) {
+            sectionOptions.headers = { first: headerObj, default: defaultHeaderObj }
+            sectionOptions.properties.titlePage = true
+        } else {
+            sectionOptions.headers = { default: headerObj }
         }
+    } else {
+        // Default "Page X of Y" header
+        sectionOptions.headers = { default: createDefaultHeaderFooter(true) }
     }
 
     if (footer) {
-        const footerChildren = footer.flatMap(irToSectionChildren)
-        sectionOptions.footers = {
-            default: new Footer({ children: footerChildren }),
+        const footerChildren = await convertChildren(footer)
+        const footerObj = new Footer({ children: footerChildren })
+        const defaultFooterObj = createDefaultHeaderFooter(false)
+
+        if (footerFirstPageOnly) {
+            sectionOptions.footers = { first: footerObj, default: defaultFooterObj }
+            sectionOptions.properties.titlePage = true
+        } else {
+            sectionOptions.footers = { default: footerObj }
         }
+    } else {
+        // Default "Page X of Y" footer
+        sectionOptions.footers = { default: createDefaultHeaderFooter(false) }
     }
 
     return new Document({
@@ -94,13 +128,59 @@ export function buildDocument(input, options = {}) {
     })
 }
 
+/**
+ * Create a default header or footer with "Page X of Y" text.
+ * Mirrors legacy docxGenerator.createDefaultHeaderFooter().
+ */
+export function createDefaultHeaderFooter(isHeader) {
+    const alignment = isHeader ? AlignmentType.RIGHT : AlignmentType.CENTER
+
+    const PartType = isHeader ? Header : Footer
+
+    return new PartType({
+        children: [
+            new DocxParagraph({
+                alignment,
+                children: [
+                    new TextRun('Page '),
+                    new TextRun({ children: [PageNumber.CURRENT] }),
+                    new TextRun(' of '),
+                    new TextRun({ children: [PageNumber.TOTAL_PAGES] }),
+                ],
+            }),
+        ],
+    })
+}
+
+/**
+ * Convert an array of IR nodes to section children, handling async
+ * image fetches via Promise.all.
+ */
+async function convertChildren(nodes) {
+    const results = await Promise.all(nodes.map(irToSectionChildrenAsync))
+    return results.flat()
+}
+
 // ============================================================================
 // IR → Section-level children (Paragraph | Table)
 // ============================================================================
 
 /**
- * Convert an IR node into section-level docx children. Returns an array
- * because some nodes might expand to multiple children.
+ * Convert an IR node into section-level docx children (async for images).
+ */
+async function irToSectionChildrenAsync(node) {
+    switch (node.type) {
+        case 'table':
+            return [await irToTableAsync(node)]
+        case 'image':
+            return [await irToImageParagraph(node)]
+        default:
+            return [await irToParagraphAsync(node)]
+    }
+}
+
+/**
+ * Synchronous version for non-image nodes (backward compat).
  */
 function irToSectionChildren(node) {
     switch (node.type) {
@@ -163,7 +243,8 @@ function irToInlineChildren(node) {
         case 'internalHyperlink':
             return [irToInternalHyperlink(node)]
         case 'image':
-            // Deferred to follow-up — skip images for now.
+            // Images in inline context are skipped — they need async handling
+            // at the section level via irToImageParagraph.
             return []
         default:
             // Unknown inline: try text extraction, then recurse children.
@@ -194,7 +275,19 @@ function irToTextRunPair(node) {
         )
     }
 
-    const options = { text: node.content || '' }
+    const content = node.content || ''
+
+    // Handle page number placeholders
+    if (content === '_currentPage') {
+        result.push(new TextRun({ children: [PageNumber.CURRENT] }))
+        return result
+    }
+    if (content === '_totalPages') {
+        result.push(new TextRun({ children: [PageNumber.TOTAL_PAGES] }))
+        return result
+    }
+
+    const options = { text: content }
     if (node.bold === 'true' || node.bold === true) options.bold = true
     if (node.italics === 'true' || node.italics === true) options.italics = true
     if (node.underline) options.underline = node.underline
@@ -372,4 +465,68 @@ const TAB_RELATIVE_TO = {
 
 function toTabRelativeTo(v) {
     return TAB_RELATIVE_TO[v] ?? PositionalTabRelativeTo.MARGIN
+}
+
+// ============================================================================
+// Async variants (for image support)
+// ============================================================================
+
+async function irToParagraphAsync(node) {
+    // For now, paragraphs don't need async — delegate to sync version.
+    return irToParagraph(node)
+}
+
+async function irToTableAsync(node) {
+    // Tables don't need async either — delegate to sync.
+    return irToTable(node)
+}
+
+/**
+ * Convert an image IR node to a Paragraph containing an ImageRun.
+ * Fetches the image data asynchronously.
+ */
+async function irToImageParagraph(node) {
+    try {
+        const src = node.src || ''
+        if (!src) return new DocxParagraph({})
+
+        const imageData = await fetchImageData(src)
+
+        const width = toInt(node.transformation?.width) ?? 400
+        const height = toInt(node.transformation?.height) ?? 300
+
+        const imageOptions = {
+            data: imageData,
+            transformation: { width, height },
+        }
+
+        if (node.altText) {
+            imageOptions.altText = node.altText
+        }
+
+        if (node.floating) {
+            imageOptions.floating = node.floating
+        }
+
+        return new DocxParagraph({
+            children: [new ImageRun(imageOptions)],
+        })
+    } catch (err) {
+        console.error(`Error creating image element:`, err)
+        return new DocxParagraph({})
+    }
+}
+
+/**
+ * Fetch image data from a URL and return as ArrayBuffer.
+ * Works in browser (via fetch + blob) and Node (via fetch + arrayBuffer).
+ */
+async function fetchImageData(url) {
+    const response = await fetch(url)
+
+    if (!response.ok) {
+        throw new Error(`HTTP error fetching image: ${response.status}`)
+    }
+
+    return response.arrayBuffer()
 }
