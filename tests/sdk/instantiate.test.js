@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { instantiateContent } from '../../src/sdk/instantiate.js'
 
-// Mock a minimal TemplateEngine with just render()
+// Mock a minimal Loom engine with just render()
 const mockEngine = {
     render(template, vars) {
         return template.replace(/\{(\w+)\}/g, (_, key) => {

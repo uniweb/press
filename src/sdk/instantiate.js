@@ -7,7 +7,7 @@
  *
  * @param {Object|Array} content - ProseMirror document or content array.
  *   Shape: { type: 'doc', content: [...] } or an array of nodes.
- * @param {Object} engine - A TemplateEngine instance with render(text, vars).
+ * @param {Object} engine - A Loom instance (or any engine with a render method).
  * @param {Function} vars - Variable resolver: (key) => value.
  * @returns {Object|Array} The content tree with all text nodes instantiated.
  */
