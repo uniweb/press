@@ -1,5 +1,5 @@
 /**
- * @uniweb/documents/react — React entry point.
+ * @uniweb/press/react — React entry point.
  *
  * Foundations import the hook and builder components from here.
  * Sites import the provider and the convenience download button.

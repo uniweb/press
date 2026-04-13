@@ -1,5 +1,5 @@
 /**
- * @uniweb/documents IR layer.
+ * @uniweb/press IR layer.
  *
  * Not a public entry point — used internally by the docx adapter and
  * the orchestrator. Exported here for testing and advanced use.

@@ -1,7 +1,7 @@
 {
-    "name": "@uniweb/documents",
+    "name": "@uniweb/press",
     "version": "0.1.0",
-    "description": "Frontend document generation (Word, Excel, PDF) for Uniweb foundations",
+    "description": "Press your React components into downloadable files — Word, Excel, PDF. Registration-based pattern with lazy-loaded format adapters.",
     "type": "module",
     "exports": {
         ".": "./src/index.js",
@@ -14,21 +14,23 @@
     ],
     "keywords": [
         "uniweb",
-        "documents",
+        "press",
         "docx",
+        "xlsx",
+        "pdf",
         "report",
-        "word",
+        "document-generation",
         "react"
     ],
     "author": "Proximify",
     "license": "Apache-2.0",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/uniweb/documents.git"
+        "url": "git+https://github.com/uniweb/press.git"
     },
-    "homepage": "https://github.com/uniweb/documents#readme",
+    "homepage": "https://github.com/uniweb/press#readme",
     "bugs": {
-        "url": "https://github.com/uniweb/documents/issues"
+        "url": "https://github.com/uniweb/press/issues"
     },
     "engines": {
         "node": ">=20.19"

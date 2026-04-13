@@ -1,4 +1,4 @@
-# @uniweb/documents
+# @uniweb/press
 
 Frontend document generation for Uniweb foundations. Lets foundations produce downloadable Word, Excel, and PDF reports from live CMS data — entirely in the browser at runtime, with no backend file storage required.
 
@@ -36,7 +36,7 @@ import {
   Section,
   Paragraph,
   H1
-} from '@uniweb/documents/react'
+} from '@uniweb/press/react'
 
 function ResearchSummary({ block }) {
   const markup = (
@@ -75,7 +75,7 @@ pnpm test:watch   # watch mode
 
 ## Architecture & design decisions
 
-The full design plan, the legacy reverse-engineering that informed it, and the open questions live at `kb/plans/documents-package.md` in the workspace. Read that before making non-trivial changes.
+The full design plan, the legacy reverse-engineering that informed it, and the open questions live at `kb/plans/press-package.md` in the workspace. Read that before making non-trivial changes.
 
 ## License
 

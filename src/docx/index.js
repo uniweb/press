@@ -1,5 +1,5 @@
 /**
- * @uniweb/documents/docx — Word document adapter.
+ * @uniweb/press/docx — Word document adapter.
  *
  * Takes the IR tree (from htmlToIR) and the walker output (from the
  * orchestrator) and produces a .docx Blob via the `docx` library.

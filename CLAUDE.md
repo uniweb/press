@@ -4,13 +4,13 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-`@uniweb/documents` is a frontend document generation library for Uniweb foundations. It lets foundations produce downloadable Word, Excel, and PDF reports from live CMS data — entirely in the browser at runtime, with no backend file storage.
+`@uniweb/press` is a frontend document generation library for Uniweb foundations. It lets foundations produce downloadable Word, Excel, and PDF reports from live CMS data — entirely in the browser at runtime, with no backend file storage.
 
 ## Status
 
 **Pre-release, phase 1 in progress.** docx output is the priority. xlsx and PDF are deferred to later phases.
 
-The full design plan, decisions, and open questions live at `kb/plans/documents-package.md` in the workspace. **Read it before making non-trivial changes** — it captures the legacy reverse-engineering that shaped the architecture.
+The full design plan, decisions, and open questions live at `kb/plans/press-package.md` in the workspace. **Read it before making non-trivial changes** — it captures the legacy reverse-engineering that shaped the architecture.
 
 ## Important: No Build Step
 
@@ -87,6 +87,6 @@ node scripts/publish.js --patch  # bump patch and publish
 
 ## References
 
-- `kb/plans/documents-package.md` — full design plan and decisions
+- `kb/plans/press-package.md` — full design plan and decisions
 - Legacy reference paths in the kb plan's References section
 - `packages/kit/CLAUDE.md` — convention reference (this package mirrors kit's no-build-step pattern)

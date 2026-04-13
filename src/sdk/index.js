@@ -1,5 +1,5 @@
 /**
- * @uniweb/documents/sdk — Utilities for document-generating foundations.
+ * @uniweb/press/sdk — Utilities for document-generating foundations.
  *
  * Provides content instantiation, styled string parsing, and formatting
  * helpers that foundation authors use alongside the builder components.
