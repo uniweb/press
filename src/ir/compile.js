@@ -13,7 +13,7 @@
  */
 
 import { renderToStaticMarkup } from 'react-dom/server'
-import { htmlToIR } from '../ir/parser.js'
+import { htmlToIR } from './parser.js'
 
 /**
  * Compile all registered outputs for a given format into the shape the

@@ -1,15 +1,14 @@
 /**
- * @uniweb/press — Frontend document generation for Uniweb foundations.
+ * @uniweb/press — format-agnostic core.
  *
- * Most consumers will import from a subpath:
- *
- *   import { useDocumentOutput, DocumentProvider } from '@uniweb/press/react'
- *   import { compileDocx } from '@uniweb/press/docx'
- *
- * The root export provides the IR utilities (for advanced use).
- * The docx adapter is reachable only via '@uniweb/press/docx' so that the
- * large docx library stays out of consumers that do not call compile().
+ * The root barrel exports the registration machinery and the compile
+ * pipeline — everything a foundation needs to wire sections to the
+ * document lifecycle and turn them into a downloadable Blob. React
+ * builder components live at '@uniweb/press/docx'; the IR layer for
+ * custom-adapter authors lives at '@uniweb/press/ir'.
  */
 
-// IR utilities (for advanced use or testing)
-export { htmlToIR, attributesToProperties, attributeMap } from './ir/index.js'
+export { default as DocumentProvider } from './DocumentProvider.jsx'
+export { useDocumentOutput } from './useDocumentOutput.js'
+export { useDocumentCompile } from './useDocumentCompile.js'
+export { triggerDownload } from './triggerDownload.js'

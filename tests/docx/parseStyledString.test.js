@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseStyledString } from '../../src/sdk/parseStyledString.js'
+import { parseStyledString } from '../../src/docx/parseStyledString.js'
 
 describe('parseStyledString', () => {
     it('parses plain text', () => {

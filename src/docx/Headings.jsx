@@ -7,7 +7,7 @@
  * Maps to the `paragraph` IR node type with a `heading` property → docx
  * Paragraph with HeadingLevel.
  */
-import { parseStyledString } from '../../sdk/parseStyledString.js'
+import { parseStyledString } from './parseStyledString.js'
 import TextRun from './TextRun.jsx'
 
 function Heading({ level, data, children, ...props }) {

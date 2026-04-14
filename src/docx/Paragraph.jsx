@@ -9,7 +9,7 @@
  *
  * Maps to the `paragraph` IR node type → docx Paragraph.
  */
-import { parseStyledString } from '../../sdk/parseStyledString.js'
+import { parseStyledString } from './parseStyledString.js'
 import TextRun from './TextRun.jsx'
 
 export default function Paragraph({ as: Tag = 'p', data, children, ...props }) {

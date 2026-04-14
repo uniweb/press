@@ -1,8 +1,12 @@
 /**
- * @uniweb/press IR layer.
+ * @uniweb/press/ir — IR layer for custom format adapters.
  *
- * Not a public entry point — used internally by the docx adapter and
- * the orchestrator. Exported here for testing and advanced use.
+ * Public entry point for authors writing a new format adapter (their own
+ * xlsx flavor, a RTF writer, etc.). The IR is a tree of plain objects —
+ * no React, no docx dependency — that any adapter can walk and serialize
+ * in its own format.
  */
+
 export { htmlToIR } from './parser.js'
 export { attributesToProperties, attributeMap, setPath } from './attributes.js'
+export { compileOutputs } from './compile.js'

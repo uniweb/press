@@ -15,17 +15,11 @@ import { render } from '@testing-library/react'
 import { Packer } from 'docx'
 
 import { htmlToIR } from '../../src/ir/parser.js'
-import { buildDocument } from '../../src/docx/index.js'
-import DocumentProvider from '../../src/react/DocumentProvider.jsx'
-import { useDocumentOutput } from '../../src/react/useDocumentOutput.js'
-import { DocumentContext } from '../../src/react/DocumentContext.js'
-import {
-    Paragraph,
-    TextRun,
-    H1,
-    H2,
-    Section,
-} from '../../src/react/components/index.js'
+import { buildDocument } from '../../src/adapters/docx.js'
+import DocumentProvider from '../../src/DocumentProvider.jsx'
+import { useDocumentOutput } from '../../src/useDocumentOutput.js'
+import { DocumentContext } from '../../src/DocumentContext.js'
+import { Paragraph, TextRun, H1, H2 } from '../../src/docx/index.js'
 
 // ============================================================================
 // Sample foundation section components — these simulate what a real
@@ -40,7 +34,7 @@ function CoverSection({ block }) {
         </>
     )
     useDocumentOutput(block, 'docx', markup)
-    return <Section>{markup}</Section>
+    return <section>{markup}</section>
 }
 
 function FundingTable({ block }) {
@@ -126,7 +120,7 @@ function FundingTable({ block }) {
     )
 
     useDocumentOutput(block, 'docx', markup)
-    return <Section>{markup}</Section>
+    return <section>{markup}</section>
 }
 
 // ============================================================================

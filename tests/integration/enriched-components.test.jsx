@@ -10,14 +10,14 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { Packer } from 'docx'
 
 import { htmlToIR } from '../../src/ir/parser.js'
-import { buildDocument } from '../../src/docx/index.js'
+import { buildDocument } from '../../src/adapters/docx.js'
 import {
     H1,
     H2,
     Paragraph,
     Paragraphs,
     TextRun,
-} from '../../src/react/components/index.js'
+} from '../../src/docx/index.js'
 
 describe('enriched builder components', () => {
     it('Paragraph with data prop parses styled strings', () => {

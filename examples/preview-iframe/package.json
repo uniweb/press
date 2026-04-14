@@ -1,0 +1,22 @@
+{
+    "name": "@uniweb/press-preview-iframe",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "description": "Runnable demo: compile + preview + download with @uniweb/press.",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview"
+    },
+    "dependencies": {
+        "@uniweb/press": "workspace:*",
+        "docx-preview": "^0.3.3",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1"
+    },
+    "devDependencies": {
+        "@vitejs/plugin-react": "^4.3.0",
+        "vite": "^5.4.0"
+    }
+}

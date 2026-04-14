@@ -11,12 +11,12 @@ import React from 'react'
 import { render } from '@testing-library/react'
 import { Packer } from 'docx'
 
-import DocumentProvider from '../../src/react/DocumentProvider.jsx'
-import { useDocumentOutput } from '../../src/react/useDocumentOutput.js'
-import { DocumentContext } from '../../src/react/DocumentContext.js'
-import { Paragraph, TextRun, H1, H2 } from '../../src/react/components/index.js'
-import { compileOutputs } from '../../src/orchestrator/compile.js'
-import { buildDocument } from '../../src/docx/index.js'
+import DocumentProvider from '../../src/DocumentProvider.jsx'
+import { useDocumentOutput } from '../../src/useDocumentOutput.js'
+import { DocumentContext } from '../../src/DocumentContext.js'
+import { Paragraph, TextRun, H1, H2 } from '../../src/docx/index.js'
+import { compileOutputs } from '../../src/ir/compile.js'
+import { buildDocument } from '../../src/adapters/docx.js'
 
 /**
  * Helper: render components in a DocumentProvider and return the store.

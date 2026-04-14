@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { Packer } from 'docx'
-import { buildDocument, compileDocx } from '../../src/docx/index.js'
+import { buildDocument, compileDocx } from '../../src/adapters/docx.js'
 import { htmlToIR } from '../../src/ir/parser.js'
 
 /**

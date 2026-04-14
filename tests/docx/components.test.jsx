@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import React from 'react'
 import ReactDOMServer from 'react-dom/server'
 import { htmlToIR } from '../../src/ir/parser.js'
-import { Paragraph, TextRun, H1, H2, H3, H4, Section } from '../../src/react/components/index.js'
+import { Paragraph, TextRun, H1, H2, H3, H4 } from '../../src/docx/index.js'
 
 /**
  * Helper: render a component to static HTML, then parse to IR.
@@ -129,33 +129,6 @@ describe('Headings', () => {
             heading: 'HEADING_1',
             spacing: { after: '200' },
         })
-    })
-})
-
-describe('Section', () => {
-    it('renders a <section> wrapper (no data-type — transparent to IR)', () => {
-        const { html, ir } = renderToIR(
-            <Section>
-                <Paragraph>Content</Paragraph>
-            </Section>,
-        )
-        expect(html).toContain('<section')
-        // Section becomes a bare <section> in IR (no data-type), wrapping
-        // the paragraph child.
-        expect(ir[0].type).toBe('section')
-        expect(ir[0].children[0].type).toBe('paragraph')
-    })
-
-    it('applies default max-width classes', () => {
-        const { html } = renderToIR(<Section>x</Section>)
-        expect(html).toContain('mx-auto')
-        expect(html).toContain('max-w-4xl')
-    })
-
-    it('appends custom className', () => {
-        const { html } = renderToIR(<Section className="py-8">x</Section>)
-        expect(html).toContain('py-8')
-        expect(html).toContain('mx-auto')
     })
 })
 

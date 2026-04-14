@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { render } from '@testing-library/react'
-import DocumentProvider from '../../src/react/DocumentProvider.jsx'
-import { useDocumentOutput } from '../../src/react/useDocumentOutput.js'
-import { DocumentContext } from '../../src/react/DocumentContext.js'
+import DocumentProvider from '../../src/DocumentProvider.jsx'
+import { useDocumentOutput } from '../../src/useDocumentOutput.js'
+import { DocumentContext } from '../../src/DocumentContext.js'
 
 /**
  * Helper: render a tree and return the store from the context.
