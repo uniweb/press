@@ -6,6 +6,7 @@
     "exports": {
         ".": "./src/index.js",
         "./docx": "./src/docx/index.js",
+        "./sections": "./src/sections/index.js",
         "./ir": "./src/ir/index.js"
     },
     "files": [

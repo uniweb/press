@@ -16,10 +16,20 @@ import {
     useDocumentCompile,
     triggerDownload,
 } from '@uniweb/press'
-import { H1, H2, Paragraph, Paragraphs } from '@uniweb/press/docx'
+import { H1, H2, Paragraph } from '@uniweb/press/docx'
+import { StandardSection } from '@uniweb/press/sections'
 
 const coverBlock = { id: 'cover' }
-const summaryBlock = { id: 'summary' }
+const summaryBlock = {
+    id: 'summary',
+    content: {
+        title: 'Executive summary',
+        paragraphs: [
+            'This demo exercises the register-and-compile contract.',
+            'The same JSX you see on screen is walked to produce the .docx file.',
+        ],
+    },
+}
 const findingsBlock = { id: 'findings' }
 
 function Cover({ block }) {
@@ -33,21 +43,8 @@ function Cover({ block }) {
     return <section>{markup}</section>
 }
 
-function Summary({ block }) {
-    const markup = (
-        <>
-            <H2>Executive summary</H2>
-            <Paragraphs
-                data={[
-                    'This demo exercises the register-and-compile contract.',
-                    'The same JSX you see on screen is walked to produce the .docx file.',
-                ]}
-            />
-        </>
-    )
-    useDocumentOutput(block, 'docx', markup)
-    return <section>{markup}</section>
-}
+// Summary is rendered via <StandardSection> below — the helper handles
+// registration and the heading/paragraphs/etc. render from block.content.
 
 function Findings({ block }) {
     const markup = (
@@ -127,7 +124,7 @@ export default function App() {
             </p>
 
             <Cover block={coverBlock} />
-            <Summary block={summaryBlock} />
+            <StandardSection block={summaryBlock} />
             <Findings block={findingsBlock} />
 
             <PreviewControls iframeRef={iframeRef} />
