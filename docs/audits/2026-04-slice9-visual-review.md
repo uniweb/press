@@ -1,6 +1,6 @@
 # Slice 9 visual review — Charles Darwin annual report (docusite)
 
-**Status:** structural review complete (automated). Visual review by the user pending.
+**Status:** structural review complete + all six follow-ups landed (see "After" section below). Visual review by the user pending.
 **Author:** Claude.
 **Last updated:** 2026-04-15.
 **Scope:** the compiled `.docx` produced by the faculty-annual-report sandbox with the Down House theme, against the full Darwin test CV. Slice 9 of the docusite execution plan.
@@ -182,3 +182,86 @@ Pointers:
 - Compile script: `.sandbox/001-starter/foundation/scripts/compile-darwin.mjs`
 - Sandbox dev server: `cd .sandbox/001-starter/site && pnpm dev` (for the in-browser preview comparison)
 - Theme switcher: rename `theme.yml` ↔ `theme-modern.yml` in `.sandbox/001-starter/site/` — see `site/THEMES.md`
+
+## After — 2026-04-15 follow-up
+
+The user asked for all six improvements to ship before visual review (Bug 1 + taste calls 2–6). Each landed in one iteration and was verified against a fresh compile of `charles-darwin.docx`.
+
+### 1. Bug 1 — date normalization
+
+- **Content fix.** `site/collections/personal/darwin.md` now quotes the DOB: `born: '1809-02-12'`. This blocks YAML's implicit date-tag resolver, so the collection JSON carries a plain string instead of an ISO timestamp. The quote convention should be documented in the template README.
+- **Defensive rendering.** New helper `formatDate(input, { format })` in `foundation/src/components/helpers.js` accepts either a Date, an ISO timestamp, or a plain `YYYY-MM-DD` string and renders in one of three formats: `'year'`, `'iso-date'` (default), or `'long'` (`12 February 1809`). Has a regex fast-path for the plain-string case to avoid round-tripping through `new Date()`.
+- **PersonalInfo wiring.** Both the docx fragment and the preview `<dd>` now call `formatDate(born, { format: 'long' })`. The preview and the download read identical strings.
+- **Verified.** Grep on the recompiled `word/document.xml` finds `12 February 1809` present and no `1809-02-12T00:00:00.000Z` anywhere.
+
+### 2. Page breaks before major section H2s
+
+Nine sections now carry `data-page-break-before="true"` on their `<DocxH2>`:
+
+- Education, Employment, Research Funding, Publications, Teaching, Service, Awards, Appendix (8 section-component edits)
+- Same change mirrored into `compile-darwin.mjs`'s `renderTimeline`, `renderResearchFunding`, `renderPublications`, `renderAwards`, `renderAppendix` helpers so the audit script stays in lockstep
+
+Cover, Contents, and Personal Information still flow together on the opening pages, matching the recommendation in the original audit.
+
+**Verified.** The recompiled `word/document.xml` contains **exactly 8** `<w:pageBreakBefore/>` elements — one per H2 — and they appear in document order. (Press's `data-page-break-before` attribute lives in `src/ir/attributes.js` and flows through `irToParagraph` into `DocxParagraph({ pageBreakBefore: true })`.)
+
+### 3. Theme typography threaded through docx (the big one)
+
+The previous style pack was a static export with no reference to the site's fonts. The downloaded file used Word's defaults (Cambria headings, Calibri body). Now:
+
+- `foundation/src/components/docx-style-pack.js` is a **`buildStylePack({ readVar })` factory** that takes a CSS-var reader and bakes the resolved font families into every paragraph style's `run.font`. Reads `--font-heading` and `--font-body`, strips the quotes and fallback list, falls back to Calibri if the var is absent. Works in three contexts: the browser (ReportLayout passes `getComputedStyle(document.documentElement)`-derived reader), unit tests (pass a mock), and the Node audit script (pass a lookup object). No `@uniweb/press/docx` import — keeps Node loadability.
+- `ReportLayout/index.jsx` calls `buildStylePack({ readVar })` inside `handleDownload` with a live reader over `document.documentElement`. The result is spread into `compile('docx', { ...stylePack })`, so the compiled file inherits whatever fonts the active `theme.yml` selected. **This is the bridge between `theme.yml` and Word.** Switching themes now changes the preview *and* the download — the "one foundation, many tenants" story becomes full-stack.
+- `compile-darwin.mjs` calls `buildStylePack({ readVar })` with a hardcoded lookup for the Down House theme (`'Cormorant Garamond', serif` / `'Crimson Text', serif`) so the audit script mirrors the browser path. A richer version could parse `site/theme.yml`, but the purpose here is visual audit, not runtime fidelity.
+
+**Verified.** `word/styles.xml` now contains `Cormorant Garamond` and `Crimson Text` literally (baked into the `<w:rFonts>` elements of the `cover-title`, `cover-subtitle`, and `bibliography` styles). The dependency chain from `theme.yml` → CSS vars → live reader → style pack → docx `run.font` is end-to-end.
+
+### 4. Cover styles — `cover-title` / `cover-subtitle`
+
+New paragraph styles in the pack:
+
+- `cover-title` — 36 pt, bold, centered, heading font, 48 pt before + 12 pt after
+- `cover-subtitle` — 20 pt, centered, heading font, muted grey (`#555555`), 24 pt after
+
+`Cover/index.jsx` now passes `data-style="cover-title"` on its `<H1>` and `data-style="cover-subtitle"` on its `<H2>`. The same attribute is emitted by `compile-darwin.mjs`'s `renderCover`.
+
+**Verified.** `word/styles.xml` contains `w:styleId="cover-title"` and `w:styleId="cover-subtitle"`. `word/document.xml` references each exactly once (on the cover's first two paragraphs). The mechanism reuses the existing default `data-*` fallthrough in `src/ir/attributes.js` (which lands `data-style="foo"` at `node.style = 'foo'`) and the adapter's `options.style = node.style` pass — no new Press code needed for the attribute to flow.
+
+### 5. Research Funding column widths
+
+`COL_WIDTHS = [20, 55, 25]` → `[15, 60, 25]` in `sections/ResearchFunding/index.jsx`, matched in `compile-darwin.mjs`'s `renderResearchFunding`. The "Project and source" middle column (Darwin's £180 Murray advance, Glass-house grant, etc.) now has 5% more horizontal real estate; "Period" shrinks from 20% to 15% since most year ranges are short (`1831–1836`).
+
+**Verified.** `word/document.xml` table cells for the funding table now emit `<w:tcW w:type="pct" w:w="15%"/>` / `60%` / `25%` in every row.
+
+### 6. Recompile + XML verification
+
+Single run of `node scripts/compile-darwin.mjs` from the foundation produced a 15,787-byte `charles-darwin.docx` (was 15,626 — small increase from the three new paragraph styles). Automated XML inspection confirmed all six improvements in a single pass:
+
+| Check | Expected | Got |
+|---|---|---|
+| `cover-title` style defined in styles.xml | yes | ✓ |
+| `cover-subtitle` style defined in styles.xml | yes | ✓ |
+| `bibliography` style defined in styles.xml | yes | ✓ |
+| `Cormorant Garamond` in styles.xml | yes | ✓ |
+| `Crimson Text` in styles.xml | yes | ✓ |
+| `<w:pageBreakBefore>` count | 8 | 8 ✓ |
+| Cover paragraphs reference `cover-title` | 1 | 1 ✓ |
+| Cover paragraphs reference `cover-subtitle` | 1 | 1 ✓ |
+| `12 February 1809` present in document.xml | yes | ✓ |
+| Funding table first-row column widths (pct) | 15% / 60% / 25% | `15%` / `60%` / `25%` ✓ |
+
+All six of the original taste calls are now resolved in the compiled file. The file is ready for the user's in-Word visual review — open it, confirm the cover uses the Down House fonts, check that each major section starts on a fresh page, verify the Bibliography runs with hanging indents, and call out anything that still looks wrong. The remaining follow-ups from the original audit (section-property page margins from theme, documenting the audit script) are not blockers for visual review — they can land in Slice 10 or later.
+
+### Files touched in this round
+
+Sandbox foundation:
+- `site/collections/personal/darwin.md` (quoted date)
+- `foundation/src/components/helpers.js` (+`formatDate`, `MONTH_NAMES`)
+- `foundation/src/components/docx-style-pack.js` (rewritten as `buildStylePack({ readVar })`)
+- `foundation/src/layouts/ReportLayout/index.jsx` (`buildStylePack` wiring)
+- `foundation/src/sections/PersonalInfo/index.jsx` (`formatDate` usage)
+- `foundation/src/sections/Cover/index.jsx` (`data-style` on headings)
+- `foundation/src/sections/ResearchFunding/index.jsx` (widths + page break)
+- `foundation/src/sections/{Education,Employment,Publications,Teaching,Service,Awards,Appendix}/index.jsx` (page break)
+- `foundation/scripts/compile-darwin.mjs` (import real `buildStylePack`, emit new attributes)
+
+No changes inside `framework/press` itself — every improvement rode on the Press features already delivered by Slices 0–6. The attribute vocabulary (`data-style`, `data-page-break-before`), the adapter pass-throughs (`paragraphStyles`, `numbering`, `pageBreakBefore`), and the fallthrough rule for unknown `data-*` attributes were all sufficient to land all six improvements end-to-end.
