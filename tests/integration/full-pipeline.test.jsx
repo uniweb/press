@@ -177,8 +177,8 @@ describe('full pipeline integration', () => {
         expect(outputs[1].block).toBe(fundingBlock)
 
         // Step 3: For each registered fragment (JSX), static-render to HTML,
-        // then parse to IR. This is the step that would live in the
-        // orchestrator's compile function.
+        // then parse to IR. This is what compileOutputs() in src/ir/compile.js
+        // does for docx; the test does it inline to keep the pipeline explicit.
         const irSections = outputs.map(({ fragment }) => {
             const html = renderToStaticMarkup(fragment)
             return htmlToIR(html)

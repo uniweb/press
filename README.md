@@ -19,13 +19,11 @@ One source of truth. Zero drift. Works entirely in the browser — no server, no
 ```jsx
 import {
     DocumentProvider,
-    DownloadButton,
     useDocumentOutput,
-    H1,
-    H2,
-    Paragraph,
-    Paragraphs,
-} from '@uniweb/press/react'
+    useDocumentCompile,
+    triggerDownload,
+} from '@uniweb/press'
+import { H1, H2, Paragraph, Paragraphs } from '@uniweb/press/docx'
 
 // A section component that renders both preview AND registers a docx fragment
 function CoverPage({ block, content }) {
@@ -44,7 +42,20 @@ function CoverPage({ block, content }) {
     return <section>{markup}</section>
 }
 
-// Wrap your report page in a provider and add a download button
+function DownloadControls() {
+    const { compile, isCompiling } = useDocumentCompile()
+    const handleDownload = async () => {
+        const blob = await compile('docx', { title: 'Annual Report' })
+        triggerDownload(blob, 'report.docx')
+    }
+    return (
+        <button onClick={handleDownload} disabled={isCompiling}>
+            {isCompiling ? 'Generating…' : 'Download'}
+        </button>
+    )
+}
+
+// Wrap your report page in a provider and drive the download from your own UI
 function Report() {
     return (
         <DocumentProvider>
@@ -59,19 +70,19 @@ function Report() {
                     ],
                 }}
             />
-            <DownloadButton format="docx" fileName="report.docx">
-                Download Report
-            </DownloadButton>
+            <DownloadControls />
         </DocumentProvider>
     )
 }
 ```
 
 When the user clicks Download:
-1. The docx format adapter lazy-loads (~400 KB, only loaded on demand)
+1. The docx format adapter lazy-loads (the ~3.4 MB `docx` library, only loaded on demand)
 2. Press walks all blocks registered under the provider
 3. Each registered JSX fragment is rendered to static HTML, parsed to an IR, and converted to docx primitives
-4. A `.docx` Blob is produced and the browser downloads it
+4. A `.docx` Blob is produced; `triggerDownload` hands it to the browser
+
+`compile` returns a Blob; it does not trigger a download. This lets you preview the compiled file (e.g., render it into an iframe with `docx-preview`) before saving. See `examples/preview-iframe/` for a runnable demo of the full compile + preview + download flow.
 
 ## The registration pattern
 
@@ -97,8 +108,7 @@ import {
     Image, Images,  // images with sizing, alt text, auto-fetch during compile
     Link, Links,    // external/internal hyperlinks, auto-detected
     List, Lists,    // nested bullet/numbered lists
-    Section,        // layout wrapper (max-width, padding)
-} from '@uniweb/press/react'
+} from '@uniweb/press/docx'
 ```
 
 Builders with a `data` prop parse inline HTML marks (`<strong>`, `<em>`, `<u>`) into styled text automatically:
@@ -127,12 +137,12 @@ Press ships as a small set of focused entry points — import only what you need
 
 | Entry point | What's in it |
 |---|---|
-| `@uniweb/press/react` | `DocumentProvider`, `useDocumentOutput`, `DownloadButton`, builder components |
-| `@uniweb/press/sdk` | Content helpers: `instantiateContent`, `parseStyledString`, `makeCurrency`, `makeRange`, `join` |
-| `@uniweb/press/docx` | The docx format adapter (~400 KB, lazy-loaded) |
-| `@uniweb/press` | IR utilities (`htmlToIR`, `attributeMap`) for advanced use |
+| `@uniweb/press` | `DocumentProvider`, `useDocumentOutput`, `useDocumentCompile`, `triggerDownload` — the format-agnostic core |
+| `@uniweb/press/docx` | React builder components (`Paragraph`, `TextRun`, `H1`–`H4`, `Image`, `Link`, `List`, …) |
+| `@uniweb/press/sections` | Section templates: `Section` (generic register-and-render wrapper), `StandardSection` (opinionated renderer for the standard content shape) |
+| `@uniweb/press/ir` | IR utilities (`htmlToIR`, `attributeMap`, `compileOutputs`) for custom-adapter authors |
 
-Most users will only ever import from `/react`. The orchestrator and adapters are loaded on demand by `DownloadButton`.
+Most foundations import from `@uniweb/press` and `@uniweb/press/docx`. The `docx` library itself is never pulled into the main bundle — it is loaded dynamically the first time `compile('docx')` runs.
 
 ## Format support
 
@@ -157,11 +167,38 @@ You can build your own adapter by walking the registration store (`compileOutput
 
 ## See also
 
-- [`@uniweb/loom`](https://github.com/uniweb/loom) — A small expression language for weaving data into text. Useful for content that needs to reference dynamic values (`{family_name}`, `{", " city province country}`, etc.) before reaching your components. Works well with Press via the `instantiateContent` helper in `@uniweb/press/sdk`.
+- [`@uniweb/loom`](https://github.com/uniweb/loom) — A small expression language for weaving data into text. Useful for content that needs to reference dynamic values (`{family_name}`, `{", " city province country}`, etc.) before reaching your components. Loom's `instantiateContent` helper walks a ProseMirror content tree and resolves placeholders against live data; a Uniweb foundation typically calls it from a content handler upstream of Press so the JSX Press sees is already fully resolved.
 
 ## Status
 
-**Pre-1.0.** The registration architecture, builder components, IR layer, and docx adapter are stable and covered by ~135 tests. The API is unlikely to change before 1.0, but treat the version number as guidance. xlsx and PDF adapters are on the roadmap.
+**Pre-1.0, unpublished.** The registration architecture, builder components, section templates, IR layer, and docx adapter are stable and covered by 133 tests. The public surface is expected to hold through 1.0. xlsx and PDF adapters are on the roadmap.
+
+## Development
+
+Press ships raw source — there is no build step. Edits in `src/` are immediately effective in any linked workspace package.
+
+```bash
+pnpm test           # vitest run — full suite
+pnpm test:watch     # watch mode
+pnpm test tests/docx/                # one directory
+pnpm test -t 'inline marks'          # by test name
+```
+
+Test layout mirrors `src/`: `tests/core/`, `tests/docx/`, `tests/sections/`, `tests/ir/`, plus `tests/integration/` for end-to-end cases.
+
+To run the preview-iframe demo:
+
+```bash
+cd examples/preview-iframe
+pnpm install
+pnpm dev
+```
+
+It registers three sections in a `DocumentProvider` and exposes Preview (compiles and renders via `docx-preview` into a sandboxed iframe) and Download (compiles and calls `triggerDownload`) buttons.
+
+**Adding a builder component:** create `src/docx/MyWidget.jsx`, export it from `src/docx/index.js`, extend `src/ir/attributes.js`'s `attributeMap` if the component introduces new `data-*` keys, and add component tests under `tests/docx/`.
+
+**Adding a format adapter:** create `src/adapters/my-format.js` exporting a `compileMyFormat(compiledInput, options) → Promise<Blob>` function, add a loader to the `ADAPTERS` map in `src/useDocumentCompile.js` (e.g., `myFormat: () => import('./adapters/my-format.js')`), and branch in `src/ir/compile.js` if the format needs a different input shape. The adapter must **not** appear in `package.json`'s `exports` field — keeping it internal is what preserves the lazy-loading story for heavy format libraries. If your format also needs React primitives, add `src/<format>/` + a `./<format>` subpath in `exports`, mirroring the docx layout.
 
 ## License
 

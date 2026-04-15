@@ -1,12 +1,16 @@
 /**
- * @uniweb/press/docx — Word document adapter.
+ * Internal docx format adapter.
  *
- * Takes the IR tree (from htmlToIR) and the walker output (from the
- * orchestrator) and produces a .docx Blob via the `docx` library.
+ * Takes the output of the compile pipeline (src/ir/compile.js) —
+ * { sections, header, footer } of IR node arrays — and produces a .docx
+ * Blob via the `docx` library.
  *
- * This is the modern replacement for legacy docxGenerator.js.
+ * This module is internal. It is NOT listed in package.json's exports
+ * field; consumers reach it only via the dynamic import inside
+ * useDocumentCompile, which keeps the ~3.4 MB docx library out of the
+ * main bundle.
  *
- * Entry point: `compileDocx(walkerOutput, options)` → `Promise<Blob>`
+ * Entry point: compileDocx(compiledInput, options) → Promise<Blob>
  *
  * Supports: Paragraph, TextRun, Table, Headings, Hyperlinks,
  * PositionalTab, Images (async), page numbering, default headers/footers.
@@ -45,7 +49,7 @@ import {
 /**
  * Compile walker output into a .docx Blob ready for browser download.
  *
- * @param {Object} input - Output of the orchestrator's `compile('docx')`.
+ * @param {Object} input - Output of compileOutputs(store, 'docx').
  * @param {Object[][]} input.sections - Array of IR node arrays (one per block).
  * @param {Object[]|null} [input.header] - IR nodes for the document header.
  * @param {Object[]|null} [input.footer] - IR nodes for the document footer.

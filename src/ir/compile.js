@@ -1,15 +1,15 @@
 /**
- * Compile registered document outputs into the shape format adapters expect.
+ * Bridge between the React registration layer (DocumentProvider +
+ * useDocumentOutput) and the format adapters (docx, xlsx, pdf).
  *
- * This is the orchestrator — the bridge between the React registration layer
- * (DocumentProvider + useDocumentOutput) and the format adapters (docx, xlsx).
- *
- * For docx: registered JSX fragments are statically rendered to HTML, parsed
- * to IR, and grouped into { header, footer, sections }.
+ * For docx (and any HTML-based format): registered JSX fragments are
+ * statically rendered to HTML, parsed to IR, and grouped into
+ * { header, footer, sections }.
  *
  * For xlsx: registered data objects are collected as-is (no IR conversion).
  *
- * Mirrors the legacy PrinterCore.getPageReport() walker.
+ * useDocumentCompile is the typical caller; custom adapter authors can
+ * invoke compileOutputs() directly via the @uniweb/press/ir subpath.
  */
 
 import { renderToStaticMarkup } from 'react-dom/server'

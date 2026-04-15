@@ -1,8 +1,9 @@
 /**
  * Provider that holds document output registrations.
  *
- * Wrap a report page (or section of the page) in <DocumentProvider> to
- * enable the useDocumentOutput hook and DownloadButton.
+ * Wrap a report page (or a sub-tree of it) in <DocumentProvider> to enable
+ * useDocumentOutput (in section components) and useDocumentCompile (in
+ * whatever UI drives the download).
  *
  * The provider holds a WeakMap<block, Map<format, OutputEntry>> and exposes
  * a register function and a getOutputs function. The WeakMap ensures that
@@ -14,7 +15,7 @@
  *   <DocumentProvider>
  *     <SectionComponent block={block1} />
  *     <SectionComponent block={block2} />
- *     <DownloadButton format="docx" />
+ *     <DownloadControls />
  *   </DocumentProvider>
  */
 import { useMemo } from 'react'

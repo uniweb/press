@@ -1,5 +1,5 @@
 /**
- * Tests for the orchestrator compile step.
+ * Tests for the compile pipeline (src/ir/compile.js).
  *
  * Verifies that compileOutputs correctly:
  * - Converts JSX fragments to IR for docx
