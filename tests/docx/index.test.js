@@ -260,10 +260,19 @@ describe('default headers/footers', () => {
  * Lets tests assert on XML-level output (e.g., <w:pStyle w:val="X"/>).
  */
 async function readDocumentXml(doc) {
+    return readPartXml(doc, 'word/document.xml')
+}
+
+/**
+ * Read any file inside a packed docx buffer. Useful for inspecting
+ * word/styles.xml or word/numbering.xml alongside word/document.xml.
+ */
+async function readPartXml(doc, partPath) {
     const buffer = await Packer.toBuffer(doc)
     const JSZip = (await import('jszip')).default
     const zip = await JSZip.loadAsync(buffer)
-    return zip.file('word/document.xml').async('string')
+    const file = zip.file(partPath)
+    return file ? file.async('string') : null
 }
 
 describe('paragraph-level data-style (R5 gap #2)', () => {
@@ -309,5 +318,183 @@ describe('paragraph-level data-style (R5 gap #2)', () => {
         const pStart = xml.lastIndexOf('<w:p ', bodyIdx)
         const paragraphFragment = xml.slice(pStart, bodyIdx)
         expect(paragraphFragment).not.toContain('w:pStyle')
+    })
+})
+
+// ============================================================================
+// paragraphStyles and numbering pass-through (R5 gap #3 scaffold)
+// ============================================================================
+
+describe('paragraphStyles option', () => {
+    it('passes a named paragraph style to word/styles.xml', async () => {
+        const ir = [
+            {
+                type: 'paragraph',
+                style: 'bibliography',
+                children: [{ type: 'text', content: 'Hanging indent entry' }],
+            },
+        ]
+
+        const doc = await buildDocument(
+            { sections: [ir] },
+            {
+                paragraphStyles: [
+                    {
+                        id: 'bibliography',
+                        name: 'Bibliography',
+                        basedOn: 'Normal',
+                        next: 'Normal',
+                        quickFormat: true,
+                        run: { size: 22 }, // half-points = 11pt
+                        paragraph: {
+                            indent: { left: 720, hanging: 720 },
+                            spacing: { after: 120 },
+                        },
+                    },
+                ],
+            },
+        )
+
+        const stylesXml = await readPartXml(doc, 'word/styles.xml')
+        expect(stylesXml).not.toBeNull()
+        // The style definition lives in word/styles.xml. The id appears
+        // as w:styleId on the <w:style> element.
+        expect(stylesXml).toContain('w:styleId="bibliography"')
+        // And the display name shows up too.
+        expect(stylesXml).toContain('w:val="Bibliography"')
+
+        // The paragraph in word/document.xml references the style by id.
+        const documentXml = await readDocumentXml(doc)
+        expect(documentXml).toContain('w:val="bibliography"')
+    })
+
+    it('omits the styles block when no paragraphStyles are passed', async () => {
+        // Baseline: a document with no caller-supplied styles still works
+        // and its styles.xml does not contain a "bibliography" custom entry.
+        const doc = await buildDocument({
+            sections: [
+                [
+                    {
+                        type: 'paragraph',
+                        children: [{ type: 'text', content: 'Unstyled' }],
+                    },
+                ],
+            ],
+        })
+        const stylesXml = await readPartXml(doc, 'word/styles.xml')
+        // The default styles file exists and contains built-ins, but not
+        // a style id we'd recognise from this test.
+        expect(stylesXml).not.toContain('w:styleId="bibliography"')
+    })
+
+    it('ignores an empty paragraphStyles array', async () => {
+        // Passing paragraphStyles: [] should behave the same as omitting it.
+        const doc = await buildDocument(
+            {
+                sections: [
+                    [
+                        {
+                            type: 'paragraph',
+                            children: [{ type: 'text', content: 'Empty list' }],
+                        },
+                    ],
+                ],
+            },
+            { paragraphStyles: [] },
+        )
+        const stylesXml = await readPartXml(doc, 'word/styles.xml')
+        expect(stylesXml).not.toContain('w:styleId="bibliography"')
+    })
+})
+
+describe('numbering option', () => {
+    it('passes a numbering config to word/numbering.xml', async () => {
+        const ir = [
+            {
+                type: 'paragraph',
+                numbering: { reference: 'biblio-numbering', level: 0 },
+                children: [{ type: 'text', content: 'First reference' }],
+            },
+        ]
+
+        const doc = await buildDocument(
+            { sections: [ir] },
+            {
+                numbering: [
+                    {
+                        reference: 'biblio-numbering',
+                        levels: [
+                            {
+                                level: 0,
+                                format: 'decimal',
+                                text: '%1.',
+                                alignment: 'start',
+                                style: {
+                                    paragraph: {
+                                        indent: { left: 720, hanging: 360 },
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                ],
+            },
+        )
+
+        const numberingXml = await readPartXml(doc, 'word/numbering.xml')
+        expect(numberingXml).not.toBeNull()
+        // The numbering reference we defined should appear in numbering.xml.
+        // The docx library assigns numeric IDs; the format marker is what
+        // we can assert directly without knowing the ID.
+        expect(numberingXml).toContain('w:val="decimal"')
+        expect(numberingXml).toContain('%1.')
+    })
+
+    it('produces a valid document when numbering is omitted', async () => {
+        // Baseline: no numbering config, document still packs. This is
+        // the check that the scaffold is a no-op for non-callers.
+        const doc = await buildDocument({
+            sections: [
+                [
+                    {
+                        type: 'paragraph',
+                        children: [{ type: 'text', content: 'No numbering' }],
+                    },
+                ],
+            ],
+        })
+        const buffer = await Packer.toBuffer(doc)
+        expect(buffer[0]).toBe(0x50)
+    })
+})
+
+describe('document metadata (title, creator, ...)', () => {
+    it('forwards non-paragraphStyles/numbering options to the Document constructor', async () => {
+        const doc = await buildDocument(
+            {
+                sections: [
+                    [
+                        {
+                            type: 'paragraph',
+                            children: [{ type: 'text', content: 'Body' }],
+                        },
+                    ],
+                ],
+            },
+            {
+                title: 'Annual Report',
+                creator: 'Dr. Jane Example',
+                subject: 'Faculty Annual Report',
+                description: 'Automatically generated',
+                keywords: 'report, faculty, annual',
+            },
+        )
+
+        // These become properties in docProps/core.xml.
+        const coreXml = await readPartXml(doc, 'docProps/core.xml')
+        expect(coreXml).not.toBeNull()
+        expect(coreXml).toContain('Annual Report')
+        expect(coreXml).toContain('Dr. Jane Example')
+        expect(coreXml).toContain('Faculty Annual Report')
     })
 })

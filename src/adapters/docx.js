@@ -53,8 +53,11 @@ import {
  * @param {Object[][]} input.sections - Array of IR node arrays (one per block).
  * @param {Object[]|null} [input.header] - IR nodes for the document header.
  * @param {Object[]|null} [input.footer] - IR nodes for the document footer.
- * @param {Object} [options] - Passed through to docx `Document` constructor
- *   (title, subject, creator, description, etc.).
+ * @param {Object} [options] - Document-level options. See buildDocument()
+ *   for the full shape; metadata fields (title, subject, creator, ...)
+ *   pass through to the docx Document constructor, and the special
+ *   paragraphStyles and numbering keys are extracted and shaped into
+ *   the constructor's styles and numbering blocks.
  * @returns {Promise<Blob>}
  */
 export async function compileDocx(input, options = {}) {
@@ -70,7 +73,20 @@ export async function compileDocx(input, options = {}) {
  * Now async because image IR nodes require fetching image data.
  *
  * @param {Object} input
- * @param {Object} [options]
+ * @param {Object} [options] - Document-level options:
+ *   - paragraphStyles: Array<ParagraphStyle> — named paragraph styles
+ *     that paragraphs can reference via `data-style="…"`. Passed through
+ *     to `new Document({ styles: { paragraphStyles } })`. Shape matches
+ *     the docx library's ParagraphStyle interface.
+ *   - numbering: Array<NumberingConfig> — numbering definitions that
+ *     paragraphs can reference via `data-numbering-reference="…"`.
+ *     Passed through to `new Document({ numbering: { config } })`.
+ *   - Any other key (title, subject, creator, description, keywords, …)
+ *     is forwarded as-is to the Document constructor.
+ *
+ *   Callers that omit paragraphStyles/numbering pay nothing — the
+ *   adapter still produces a valid document, it just has no named
+ *   style or numbering definitions for paragraphs to reference.
  * @returns {Promise<Document>}
  */
 export async function buildDocument(input, options = {}) {
@@ -81,6 +97,12 @@ export async function buildDocument(input, options = {}) {
         headerFirstPageOnly = false,
         footerFirstPageOnly = false,
     } = input
+
+    const {
+        paragraphStyles,
+        numbering,
+        ...documentMetadata
+    } = options
 
     // Flatten all blocks' IR trees into one array of section children.
     // Use async conversion for image support.
@@ -126,10 +148,20 @@ export async function buildDocument(input, options = {}) {
         sectionOptions.footers = { default: createDefaultHeaderFooter(false) }
     }
 
-    return new Document({
-        ...options,
+    const docOptions = {
+        ...documentMetadata,
         sections: [sectionOptions],
-    })
+    }
+
+    if (paragraphStyles && paragraphStyles.length) {
+        docOptions.styles = { paragraphStyles }
+    }
+
+    if (numbering && numbering.length) {
+        docOptions.numbering = { config: numbering }
+    }
+
+    return new Document(docOptions)
 }
 
 /**
