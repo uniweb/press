@@ -171,11 +171,14 @@ function MarkdownControls() {
 Section components that want to contribute to Markdown output register under the `'markdown'` format key:
 
 ```jsx
-function Cover({ block, content }) {
+function Cover({ content, block }) {
+    const { title, subtitle, paragraphs } = content
+
     const markup = (
         <>
-            <H1 data={content.title} />
-            <Paragraph data={content.body} />
+            <H1 data={title} />
+            <H2 data={subtitle} />
+            <Paragraphs data={paragraphs} />
         </>
     )
 
@@ -184,17 +187,17 @@ function Cover({ block, content }) {
     useDocumentOutput(block, 'docx', markup)
     useDocumentOutput(block, 'markdown', markup)
 
-    return <section>{markup}</section>
+    return <div className="max-w-4xl mx-auto">{markup}</div>
 }
 ```
 
-Or, if the markdown version diverges from the docx version:
+Or, if the markdown version diverges from the docx version — for example, markdown gets a condensed summary while docx gets the full text:
 
 ```jsx
 useDocumentOutput(block, 'markdown', (
     <>
-        <H1>{content.title}</H1>
-        <Paragraph>{content.bodyPlain}</Paragraph>
+        <H1 data={content.title} />
+        <Paragraph data={content.paragraphs[0] || ''} />
     </>
 ))
 ```

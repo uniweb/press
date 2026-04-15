@@ -1,6 +1,22 @@
 # The preview pattern
 
-Render a compiled `.docx` into an iframe in your own app so users can review the document before downloading it. This is the flow the [`examples/preview-iframe/`](../../examples/preview-iframe/) demo exercises end to end.
+Render the compiled `.docx` into an iframe in your own app so users can inspect it *as Word would render it* before downloading. This is a different kind of preview from the React render your section components already produce — it's a cross-check view of the compiled output, useful when you want "show me what Word will see" rather than "show me what the content is."
+
+This is the flow the [`examples/preview-iframe/`](../../examples/preview-iframe/) demo exercises end to end.
+
+## Two kinds of preview, don't confuse them
+
+Press-aware section components render a React preview as a side effect of existing. That preview is your app's native view of the content — rich, interactive, theme-aware, whatever you design it to be. You get it for free from the component's return value; Press's registration hook runs alongside the render without touching it.
+
+`docx-preview` is a *different* preview. It parses a compiled `.docx` Blob and renders its internal structure as HTML/CSS, mimicking how Word would render the same file. It's a cross-check view: "did the compile pipeline produce what I expected?" It's fragile outside a real browser, approximates rather than matches Word's fidelity, and costs a separate library to install — but it's invaluable when you want users to inspect the actual file before saving it (e.g., "will this print correctly?") rather than inspecting the source content.
+
+Most Uniweb foundations don't need docx-preview at all. Their section components already render the content nicely in React; the Download button just compiles and saves. docx-preview enters the picture when:
+
+- The user needs to verify that a specific feature (table layout, page break, header/footer, numbering) survived the compile step.
+- The preview and the compiled output are allowed to differ (e.g., different visualizations per medium, Mode 3 in [Concepts](../concepts.md)), and the user wants a "but what does the *file* actually look like?" view.
+- You're building a review workflow where editors sign off on the file before it leaves the system.
+
+If none of those apply, the component-level React preview is enough and you can skip this guide.
 
 ## Why compile and download are separate
 
@@ -14,9 +30,9 @@ const handleClick = async () => {
 }
 ```
 
-But the same `compile('docx')` call gives you a Blob you can render anywhere — an iframe, a sandboxed `<div>`, a print preview pane. The split exists because one of the most valuable things Press enables is **in-app review of the file before it's saved.** Users click Preview, see exactly what they'll get, *then* click Download.
+The same `compile('docx')` call gives you a Blob you can render anywhere — an iframe, a sandboxed `<div>`, a print preview pane, a Web Worker. The split exists so one compile can power both a cross-check preview and a download without any caching machinery inside Press.
 
-If `compile` saved a file automatically, a "preview" button would have to compile twice — once to render, once to download when the user finally clicks the save button. Separating them means one compile powers both.
+If `compile` saved a file automatically, a preview workflow would have to compile twice — once to render into the iframe, once to download when the user finally clicks Save. Separating them means one compile powers both.
 
 ## The flow
 
@@ -40,29 +56,18 @@ If your app is already strictly scoped (e.g., Shadow DOM, or a rendering context
 
 ## Minimal implementation
 
+The `PreviewControls` component below pairs a Preview button (compile → render into iframe via `docx-preview`) and a Download button (compile → save). In a Uniweb foundation, put it inside a layout alongside the `<DocumentProvider>` that wraps the page's sections. In a non-Uniweb React app, put it anywhere inside the provider subtree.
+
 ```jsx
 import React, { useRef, useState } from 'react'
 import {
-    DocumentProvider,
-    useDocumentOutput,
     useDocumentCompile,
     triggerDownload,
 } from '@uniweb/press'
-import { H1, Paragraph } from '@uniweb/press/docx'
 
-function Cover({ block, content }) {
-    const markup = (
-        <>
-            <H1 data={content.title} />
-            <Paragraph data={content.body} />
-        </>
-    )
-    useDocumentOutput(block, 'docx', markup)
-    return <section>{markup}</section>
-}
-
-function PreviewControls({ iframeRef }) {
+function PreviewControls() {
     const { compile, isCompiling } = useDocumentCompile()
+    const iframeRef = useRef(null)
     const [error, setError] = useState(null)
 
     const runPreview = async () => {
@@ -95,33 +100,27 @@ function PreviewControls({ iframeRef }) {
 
     return (
         <div>
-            <button onClick={runPreview} disabled={isCompiling}>
-                Preview
-            </button>
-            <button onClick={runDownload} disabled={isCompiling}>
-                Download
-            </button>
-            {error && <p style={{ color: 'crimson' }}>{error}</p>}
-        </div>
-    )
-}
-
-export default function Report({ cover }) {
-    const iframeRef = useRef(null)
-    return (
-        <DocumentProvider>
-            <Cover block={cover} content={cover.content} />
-            <PreviewControls iframeRef={iframeRef} />
+            <div className="flex gap-2">
+                <button onClick={runPreview} disabled={isCompiling}>
+                    Preview
+                </button>
+                <button onClick={runDownload} disabled={isCompiling}>
+                    Download
+                </button>
+            </div>
+            {error && <p className="text-error">{error}</p>}
             <iframe
                 ref={iframeRef}
                 title="Compiled .docx preview"
                 sandbox="allow-same-origin"
                 style={{ width: '100%', height: 600, border: '1px solid #ccc' }}
             />
-        </DocumentProvider>
+        </div>
     )
 }
 ```
+
+The section components in the page take care of themselves — each one calls `useDocumentOutput` in its own render, and the provider accumulates their registrations. When the user clicks Preview or Download, `compile` walks whatever is in the store at that moment.
 
 Key details:
 

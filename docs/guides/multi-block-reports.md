@@ -4,26 +4,62 @@ How `DocumentProvider` aggregates output across multiple section components into
 
 ## One provider, many sections
 
-A real report is never one section. It's a cover, a summary, some data tables, a conclusion, maybe a signature block. Press handles this with a single `<DocumentProvider>` wrapping the whole page:
+A real report is never one section. It's a cover, a summary, some data tables, a conclusion, maybe a signature block. Press handles this with a single `<DocumentProvider>` wrapping the whole page. In a Uniweb foundation, the provider typically lives inside a layout component that wraps `children`:
 
 ```jsx
+// src/layouts/ReportLayout/index.jsx
 import { DocumentProvider } from '@uniweb/press'
 
-function AnnualReport({ blocks }) {
+function ReportLayout({ children }) {
+    return (
+        <DocumentProvider>
+            {children}
+            <DownloadControls />
+        </DocumentProvider>
+    )
+}
+
+export default ReportLayout
+```
+
+The content author then composes the report in markdown — one `.md` file per section, each with its own `type:` in frontmatter. The Uniweb runtime renders each section in order, passes each its own `block` object, and everything inside the layout's `DocumentProvider` is in scope:
+
+```markdown
+# cover.md
+---
+type: Cover
+---
+# Annual Report
+...
+
+# summary.md
+---
+type: Summary
+---
+...
+```
+
+Every section component calls `useDocumentOutput(block, 'docx', markup)` from its own render. The provider holds a `WeakMap<block, Map<format, entry>>` plus a parallel array that preserves registration order. When `compile('docx')` runs, the store is walked in that order and each entry is compiled.
+
+In non-Uniweb React apps, the equivalent is assembling sections manually and passing each a stable block identity:
+
+```jsx
+function Report() {
+    const blocks = useMemo(
+        () => ({ cover: { id: 'cover' }, summary: { id: 'summary' } }),
+        [],
+    )
     return (
         <DocumentProvider>
             <Cover block={blocks.cover} />
             <Summary block={blocks.summary} />
-            <ResearchFunding block={blocks.funding} />
-            <Publications block={blocks.publications} />
-            <Conclusion block={blocks.conclusion} />
             <DownloadControls />
         </DocumentProvider>
     )
 }
 ```
 
-Every section component calls `useDocumentOutput(block, 'docx', markup)` from its own render. The provider holds a `WeakMap<block, Map<format, entry>>` plus a parallel array that preserves registration order. When `compile('docx')` runs, the store is walked in that order and each entry is compiled.
+Either way, the provider aggregates whatever sections render inside it.
 
 ## Registration order is render order
 
@@ -121,23 +157,25 @@ The docx adapter also provides a default "Page X of Y" footer if no footer is re
 The `format` argument to `useDocumentOutput` is an arbitrary string. A section can register for more than one format:
 
 ```jsx
-function Findings({ block, content }) {
+function Findings({ content, block }) {
+    const { title, paragraphs, data } = content
+
     const docxMarkup = (
         <>
-            <H2>Findings</H2>
-            <Paragraphs data={content.paragraphs} />
+            <H2 data={title} />
+            <Paragraphs data={paragraphs} />
         </>
     )
     useDocumentOutput(block, 'docx', docxMarkup)
 
-    // Hypothetical xlsx-aware section:
+    // Also contribute an xlsx row set from the same block:
     useDocumentOutput(block, 'xlsx', {
-        title: 'Findings',
+        title,
         headers: ['Finding', 'Year', 'Impact'],
-        data: content.tableRows,
+        data: data?.rows || [],
     })
 
-    return <section>{docxMarkup}</section>
+    return <div className="max-w-4xl mx-auto">{docxMarkup}</div>
 }
 ```
 

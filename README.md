@@ -1,6 +1,6 @@
 # @uniweb/press
 
-**Press your React components into downloadable files.** Write the same JSX once, get a live preview in your app *and* a real `.docx` file when users click Download. Word today; Excel and PDF in the roadmap.
+**Alternate outputs from Uniweb content.** A Uniweb site is pure content — markdown files, parsed into a guaranteed shape, delivered to React components. Press is a framework that lets foundations turn that content into downloadable files (Word, Excel, PDF, anything else) using the same section components that render the website. One source, many outputs.
 
 ```bash
 npm install @uniweb/press
@@ -8,32 +8,67 @@ npm install @uniweb/press
 
 ## Why
 
-Most document-generation libraries make you build the document twice: once for the screen, once for the file. The two representations drift, because they're maintained separately and tested separately and every edit has to happen in two places.
+A Uniweb site is, in a useful sense, a URL that represents a document. Titles, paragraphs, tables, lists, tagged data blocks — all already parsed, all already available to section components. With Loom and dynamic data fetching, that document can be live and hierarchical: a report whose sections instantiate against a CV profile, a publication list that updates automatically, a program whose entries are filtered per department. The content is right there.
 
-Press takes a different approach. Section components emit ordinary JSX using a small library of **builder components** (`<Paragraph>`, `<H1>`, `<TextRun>`, `<Image>`, …). The same JSX renders in the browser for preview, and when the user clicks Download, Press walks the tree, parses the rendered HTML into an intermediate representation, and hands that to a **format adapter** which produces a `.docx` Blob.
+Press is the output layer of that system. It gives foundations:
 
-One source of truth. Zero drift. Works entirely in the browser — no server, no backend file storage, no intermediate upload.
+- A **registration hook** (`useDocumentOutput`) so a section component can say "here is what I produce for this format."
+- A **compile hook** (`useDocumentCompile`) that walks all registered sections in a page and produces a `Blob` for the requested format.
+- A **download utility** (`triggerDownload`) for saving the Blob to a file.
+- A **docx toolkit** — React builder components and a lazy-loaded format adapter — for the most common output format.
+
+The core is **format-agnostic**. Press ships a docx toolkit today, and xlsx and pdf toolkits are on the roadmap. But you can use Press right now to generate any format you want by writing your own adapter against `@uniweb/press/ir`. Press is a framework for alternate outputs; the docx toolkit is one implementation of it.
 
 ## Hello world
+
+A Uniweb section component that renders both a preview and a registered docx fragment from the same JSX:
+
+```jsx
+// src/sections/Cover/index.jsx
+import { useDocumentOutput } from '@uniweb/press'
+import { H1, H2, Paragraphs } from '@uniweb/press/docx'
+
+function Cover({ content, block }) {
+    const { title, subtitle, paragraphs } = content
+
+    const body = (
+        <>
+            <H1 data={title} />
+            <H2 data={subtitle} />
+            <Paragraphs data={paragraphs} />
+        </>
+    )
+
+    useDocumentOutput(block, 'docx', body)
+
+    return <div className="max-w-4xl mx-auto">{body}</div>
+}
+
+export default Cover
+```
+
+A few things to notice:
+
+- **Standard Uniweb section shape.** `{ content, block }` destructured. `content.paragraphs` is a guaranteed array — empty if there are none, never null. No outer `<section>` wrapper, because the Uniweb runtime wraps every section in `<section>` with the right context class and background.
+- **Same JSX, two consumers.** `body` is used twice: registered for docx compilation and rendered into the visible layout. There is no duplication to drift between them.
+- **Any section is opt-in.** Sections that don't call `useDocumentOutput` are never included in the compiled document. The hook is a no-op when called outside a provider, so you can freely mix opt-in and non-opt-in sections in the same page.
+
+Somewhere higher in the tree (a layout, a header, a dedicated "download" section), add a `<DocumentProvider>` and a button that calls `compile`:
 
 ```jsx
 import {
     DocumentProvider,
-    useDocumentOutput,
     useDocumentCompile,
     triggerDownload,
 } from '@uniweb/press'
-import { H1, Paragraph } from '@uniweb/press/docx'
 
-function Cover({ block, content }) {
-    const markup = (
-        <>
-            <H1 data={content.title} />
-            <Paragraph data={content.body} />
-        </>
+function ReportLayout({ children }) {
+    return (
+        <DocumentProvider>
+            {children}
+            <DownloadControls />
+        </DocumentProvider>
     )
-    useDocumentOutput(block, 'docx', markup)
-    return <section>{markup}</section>
 }
 
 function DownloadControls() {
@@ -48,36 +83,27 @@ function DownloadControls() {
         </button>
     )
 }
-
-export default function Report({ block, content }) {
-    return (
-        <DocumentProvider>
-            <Cover block={block} content={content} />
-            <DownloadControls />
-        </DocumentProvider>
-    )
-}
 ```
 
-Two imports, one per concern: the format-agnostic machinery from the root, the docx builder components from `/docx`.
+Every section between the provider and the button that called `useDocumentOutput` contributes its registered fragment to the compiled document. The rest is ignored. The docx library itself is loaded dynamically on the first `compile('docx')` call, not at page load.
 
 ## Documentation
 
 Start here:
 
 - **[Quick start](./docs/quick-start.md)** — Ten minutes from `npm install` to a working Download button, with a live preview.
-- **[Concepts](./docs/concepts.md)** — The registration pattern, JSX-as-source-of-truth, and why the compile pipeline is split into a hook and a DOM utility.
+- **[Concepts](./docs/concepts.md)** — Why Press exists, the registration pattern, the four ways to combine preview and compiled output, why compile is separate from download, why the docx toolkit is just a toolkit.
 
 API reference:
 
 - **[Core](./docs/api/core.md)** — `DocumentProvider`, `useDocumentOutput`, `useDocumentCompile`, `triggerDownload`.
 - **[/docx](./docs/api/docx.md)** — Every builder component with runnable examples.
-- **[/sections](./docs/api/sections.md)** — `Section` and `StandardSection` — higher-level templates that remove boilerplate.
+- **[/sections](./docs/api/sections.md)** — `Section` and `StandardSection` — higher-level templates intended for non-Uniweb contexts where you need an explicit section wrapper.
 - **[/ir](./docs/api/ir.md)** — IR layer for custom format adapters.
 
 Guides:
 
-- **[The preview pattern](./docs/guides/preview-pattern.md)** — Render a compiled `.docx` into an iframe via `docx-preview` for in-app review before download.
+- **[The preview pattern](./docs/guides/preview-pattern.md)** — Render a compiled `.docx` back into a sandboxed iframe via `docx-preview` as a cross-check view, separate from the per-component React preview.
 - **[Multi-block reports](./docs/guides/multi-block-reports.md)** — How `DocumentProvider` aggregates output across many section components into one document.
 - **[Writing a custom adapter](./docs/guides/custom-adapter.md)** — Build a non-docx format adapter using `@uniweb/press/ir`.
 - **[Citations](./docs/guides/citations.md)** — The `@citestyle/*` + Press pattern for bibliographies in preview and docx.
@@ -86,36 +112,39 @@ Migration:
 
 - **[Migration from phase 1](./docs/migration-from-phase-1.md)** — For readers holding phase-1 examples with `@uniweb/press/react` and `DownloadButton`.
 
-There is also a runnable demo at [`examples/preview-iframe/`](./examples/preview-iframe/) — a minimal Vite app exercising compile + preview + download end to end.
+There is also a runnable demo at [`examples/preview-iframe/`](./examples/preview-iframe/) — a minimal standalone Vite app exercising the compile + preview + download flow end to end. It's not a Uniweb foundation; it's a plain React app demonstrating that Press works outside Uniweb as well.
 
 ## Subpath exports
 
 | Entry point | What's in it |
 |---|---|
 | `@uniweb/press` | `DocumentProvider`, `useDocumentOutput`, `useDocumentCompile`, `triggerDownload` — the format-agnostic core |
-| `@uniweb/press/docx` | React builder components (`Paragraph`, `TextRun`, `H1`–`H4`, `Image`, `Link`, `List`, …) |
-| `@uniweb/press/sections` | Section templates: `Section` (generic register-and-render wrapper), `StandardSection` (opinionated renderer for the standard content shape) |
+| `@uniweb/press/docx` | React builder components for docx output (`Paragraph`, `TextRun`, `H1`–`H4`, `Image`, `Link`, `List`, …) |
+| `@uniweb/press/sections` | `Section` and `StandardSection` — register-and-render helpers that include their own `<section>` wrapper (for non-Uniweb React contexts) |
 | `@uniweb/press/ir` | IR utilities (`htmlToIR`, `attributeMap`, `compileOutputs`) for custom-adapter authors |
 
-Most foundations import from `@uniweb/press` and `@uniweb/press/docx`. The ~3.4 MB `docx` library is never pulled into the main bundle — it is loaded dynamically the first time `compile('docx')` runs.
+The ~3.4 MB `docx` library is never pulled into the main bundle. It's loaded dynamically the first time `compile('docx')` runs.
 
-## Format support
+## Shipped toolkits and roadmap
 
-| Format | Status | Notes |
+Press separates the **framework** (registration, compile, download) from the **toolkits** (per-format React builders and adapters). The framework is stable and usable today for any format. The toolkits are the shipped conveniences:
+
+| Toolkit | Status | Notes |
 |---|---|---|
-| **docx** | ✅ Stable | Paragraphs, headings, text runs, tables, borders/margins/widths, bullet/numbered lists, hyperlinks, images with async fetch, page numbering, default headers/footers, `firstPageOnly` semantics |
-| **xlsx** | 🔜 Planned | Plain `{ title, headers, data }` objects, multi-sheet |
-| **pdf** | 🔜 Planned | Reuse docx JSX via Paged.js, or `@react-pdf/renderer` for fine control |
+| **docx** | ✅ Shipped | Paragraphs, headings, text runs, tables, borders/margins/widths, bullet/numbered lists, hyperlinks, images with async fetch, page numbering, default headers/footers, `firstPageOnly` semantics. Uses the [`docx`](https://docx.js.org) library. |
+| **xlsx** | 🔜 Roadmap | Plain `{ title, headers, data }` objects, multi-sheet. Different shape from docx because spreadsheets aren't typography. |
+| **pdf** | 🔜 Roadmap | Either docx JSX via Paged.js or `@react-pdf/renderer` for fine control. Decision deferred. |
 
-docx uses [`docx`](https://docx.js.org). Different formats need different shapes — Press deliberately does not force a single IR across all of them. What unifies them is the registration hook, not the data model.
+Writing a custom adapter (Markdown, RTF, a domain-specific XML, a JSON export) is supported today via `@uniweb/press/ir`. See the [custom adapter guide](./docs/guides/custom-adapter.md).
 
 ## See also
 
-- [`@uniweb/loom`](https://github.com/uniweb/loom) — A small expression language for weaving data into text. Useful for content that needs to reference dynamic values (`{family_name}`, `{", " city province country}`, etc.) before reaching your components. Loom's `instantiateContent` helper walks a ProseMirror content tree and resolves placeholders against live data; a Uniweb foundation typically calls it from a content handler upstream of Press so the JSX Press sees is already fully resolved.
+- [`@uniweb/loom`](https://github.com/uniweb/loom) — A small expression language for weaving data into text. The typical Uniweb report foundation uses a content handler that runs Loom's `instantiateContent` over the parsed content tree, resolving placeholders against live data before Press ever sees the section — which means dynamic reports look identical to static ones from Press's point of view.
+- [`@uniweb/kit`](https://github.com/uniweb/kit) — React components and hooks for building Uniweb foundations. The preview side of a Press-aware component typically uses Kit for theme-aware typography (`H1`, `H2`, `P`, `Prose`, `ChildBlocks`, `Visual`, etc.) alongside Press's builder components for the compiled output. See the [concepts doc](./docs/concepts.md) for the "same JSX vs separate preview" discussion.
 
 ## Status
 
-**Pre-1.0, unpublished.** The registration architecture, builder components, section templates, IR layer, and docx adapter are stable and covered by 133 tests. The public surface is expected to hold through 1.0. xlsx and PDF adapters are on the roadmap.
+**Pre-1.0, unpublished.** The registration architecture, builder components, section templates, IR layer, and docx adapter are stable and covered by 133 tests. The public surface is expected to hold through 1.0. xlsx and pdf toolkits are on the roadmap.
 
 ## Development
 

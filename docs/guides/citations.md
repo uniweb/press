@@ -21,29 +21,32 @@ import { useDocumentOutput } from '@uniweb/press'
 import { H2, Paragraphs } from '@uniweb/press/docx'
 import { SafeHtml } from '@uniweb/kit'
 
-export default function Publications({ block, content }) {
-    const publications = content?.data?.publications || []
+export default function Publications({ content, block }) {
+    const publications = content.data?.publications || []
     const formatted = publications.map((pub) => format(apa, pub))
 
     // docx version: plain text per entry
     const docxMarkup = (
         <>
-            <H2>Publications</H2>
+            <H2 data={content.title || 'Publications'} />
             <Paragraphs data={formatted.map((entry) => entry.text)} />
         </>
     )
     useDocumentOutput(block, 'docx', docxMarkup)
 
-    // Preview version: HTML with clickable DOIs, italicized journal titles
+    // Preview: HTML with clickable DOIs, italicized journal titles.
+    // The Uniweb runtime wraps this in <section> with the right context class.
     return (
-        <section>
-            <h2>Publications</h2>
-            <ol>
+        <div className="max-w-4xl mx-auto">
+            <h2 className="text-heading text-3xl font-bold">
+                {content.title || 'Publications'}
+            </h2>
+            <ol className="mt-6 space-y-3">
                 {formatted.map((entry, i) => (
                     <SafeHtml key={i} as="li" value={entry.html} />
                 ))}
             </ol>
-        </section>
+        </div>
     )
 }
 ```
@@ -79,9 +82,9 @@ If you want italicized venues and bolded years in the preview while keeping plai
 
 ```jsx
 return (
-    <section>
-        <h2>Publications</h2>
-        <ol>
+    <div className="max-w-4xl mx-auto">
+        <h2 className="text-heading text-3xl font-bold">Publications</h2>
+        <ol className="mt-6 space-y-3">
             {formatted.map((entry, i) => (
                 <li key={i}>
                     {entry.parts.authors} (<strong>{entry.parts.year}</strong>).{' '}
@@ -90,7 +93,7 @@ return (
                 </li>
             ))}
         </ol>
-    </section>
+    </div>
 )
 ```
 

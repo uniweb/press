@@ -13,17 +13,15 @@ import {
 
 ## `<DocumentProvider>`
 
-Context provider that holds all section registrations. Wrap any part of the React tree that contains section components whose output you want to collect.
+Context provider that holds all section registrations. Wrap any part of the React tree that contains section components whose output you want to collect. In a Uniweb foundation this typically goes inside a layout component so every section rendered in the page is in scope.
 
 ```jsx
 import { DocumentProvider } from '@uniweb/press'
 
-function Report() {
+function ReportLayout({ children }) {
     return (
         <DocumentProvider>
-            <Cover block={cover} />
-            <Summary block={summary} />
-            <Findings block={findings} />
+            {children}
             <DownloadControls />
         </DocumentProvider>
     )
@@ -40,27 +38,33 @@ Under React Strict Mode the provider's subtree is rendered twice during developm
 
 ## `useDocumentOutput(block, format, fragment, options?)`
 
-The registration hook. Call it from inside a section component to declare "here is my output for this format." The fragment is whatever representation the format wants — JSX for docx, a plain data object for xlsx.
+The registration hook. Call it from inside a section component to declare "here is my output for this format." The fragment is whatever representation the format wants — JSX for docx, a plain data object for xlsx, anything else a custom adapter understands.
 
 ```jsx
 import { useDocumentOutput } from '@uniweb/press'
-import { H1, Paragraph } from '@uniweb/press/docx'
+import { H1, H2, Paragraphs } from '@uniweb/press/docx'
 
-function Cover({ block, content }) {
-    const markup = (
+function Cover({ content, block }) {
+    const { title, subtitle, paragraphs } = content
+
+    const body = (
         <>
-            <H1 data={content.title} />
-            <Paragraph data={content.body} />
+            <H1 data={title} />
+            <H2 data={subtitle} />
+            <Paragraphs data={paragraphs} />
         </>
     )
-    useDocumentOutput(block, 'docx', markup)
-    return <section>{markup}</section>
+
+    useDocumentOutput(block, 'docx', body)
+    return <div className="max-w-4xl mx-auto">{body}</div>
 }
 ```
 
+This is a Uniweb section component — `{ content, block }` destructured, `content.paragraphs` is a guaranteed array, no outer `<section>` wrapper (the runtime provides it). See the [quick-start guide](../quick-start.md) for the other combinations of preview-and-registration.
+
 Arguments:
 
-- **`block`** — any object used as the WeakMap key. Typically a content object, a section id, or a plain `{ id }`. When the block is garbage collected, its registration is cleared automatically.
+- **`block`** — the Uniweb runtime's block object, used as the WeakMap key. In non-Uniweb contexts any stable object works (a content object, a section id, a plain `{ id }`). When the block is garbage collected, its registration is cleared automatically.
 - **`format`** — string identifier, e.g. `'docx'`. Not validated against a known list — foundations can register custom formats the core knows nothing about.
 - **`fragment`** — the format-specific payload. JSX for docx; plain objects for xlsx; whatever makes sense for a custom adapter.
 - **`options`** — optional registration options:
