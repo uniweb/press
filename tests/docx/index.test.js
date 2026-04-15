@@ -250,3 +250,64 @@ describe('default headers/footers', () => {
         expect(buffer.length).toBeGreaterThan(4000)
     })
 })
+
+// ============================================================================
+// Gap #2 (R5): paragraph-level data-style is forwarded to DocxParagraph
+// ============================================================================
+
+/**
+ * Unzip a packed docx buffer and read word/document.xml as a string.
+ * Lets tests assert on XML-level output (e.g., <w:pStyle w:val="X"/>).
+ */
+async function readDocumentXml(doc) {
+    const buffer = await Packer.toBuffer(doc)
+    const JSZip = (await import('jszip')).default
+    const zip = await JSZip.loadAsync(buffer)
+    return zip.file('word/document.xml').async('string')
+}
+
+describe('paragraph-level data-style (R5 gap #2)', () => {
+    it('forwards data-style from HTML through IR to the compiled paragraph', async () => {
+        const ir = htmlToIR(
+            '<p data-type="paragraph" data-style="myCustomStyle">Styled content</p>',
+        )
+        const doc = await buildDocument({ sections: [ir] })
+        const xml = await readDocumentXml(doc)
+
+        // docx library emits <w:pStyle w:val="myCustomStyle"/> inside <w:pPr>
+        expect(xml).toContain('w:val="myCustomStyle"')
+    })
+
+    it('forwards style from a directly-constructed IR node', async () => {
+        const doc = await buildDocument({
+            sections: [
+                [
+                    {
+                        type: 'paragraph',
+                        style: 'groupTitle',
+                        children: [{ type: 'text', content: 'Group heading' }],
+                    },
+                ],
+            ],
+        })
+        const xml = await readDocumentXml(doc)
+        expect(xml).toContain('w:val="groupTitle"')
+    })
+
+    it('does not emit a pStyle element for paragraphs without data-style', async () => {
+        const ir = htmlToIR('<p data-type="paragraph">Plain content</p>')
+        const doc = await buildDocument({ sections: [ir] })
+        const xml = await readDocumentXml(doc)
+        // Plain paragraphs should not have an arbitrary pStyle inserted.
+        // (The default "Page X of Y" footer may use pStyle internally;
+        // scope the check to the body paragraph by looking for
+        // "Plain content" and verifying no pStyle appears between the
+        // preceding w:pPr open and the run that carries the text.)
+        const bodyIdx = xml.indexOf('Plain content')
+        expect(bodyIdx).toBeGreaterThan(-1)
+        // Walk backwards from the text to find the enclosing w:p start.
+        const pStart = xml.lastIndexOf('<w:p ', bodyIdx)
+        const paragraphFragment = xml.slice(pStart, bodyIdx)
+        expect(paragraphFragment).not.toContain('w:pStyle')
+    })
+})

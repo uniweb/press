@@ -205,6 +205,9 @@ function irToParagraph(node) {
     if (node.heading) {
         options.heading = toHeadingLevel(node.heading)
     }
+    if (node.style) {
+        options.style = node.style
+    }
     if (node.spacing) {
         options.spacing = {}
         const before = toInt(node.spacing.before)

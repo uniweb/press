@@ -50,6 +50,7 @@
     "devDependencies": {
         "@testing-library/react": "^16.0.0",
         "jsdom": "^25.0.0",
+        "jszip": "^3.10.0",
         "vitest": "^2.0.0"
     }
 }
