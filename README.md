@@ -106,7 +106,8 @@ Guides:
 - **[The preview pattern](./docs/guides/preview-pattern.md)** — Render a compiled `.docx` back into a sandboxed iframe via `docx-preview` as a cross-check view, separate from the per-component React preview.
 - **[Multi-block reports](./docs/guides/multi-block-reports.md)** — How `DocumentProvider` aggregates output across many section components into one document.
 - **[Writing a custom adapter](./docs/guides/custom-adapter.md)** — Build a non-docx format adapter using `@uniweb/press/ir`.
-- **[Citations](./docs/guides/citations.md)** — The `@citestyle/*` + Press pattern for bibliographies in preview and docx.
+- **[Citations](./docs/guides/citations.md)** — The `citestyle` + Press pattern for bibliographies in preview and docx.
+- **[Style pack](./docs/guides/style-pack.md)** — Copy-paste `paragraphStyles` and `numbering` definitions for hanging-indent and numbered bibliography entries.
 
 Migration:
 
