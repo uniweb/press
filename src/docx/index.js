@@ -17,6 +17,7 @@ export { H1, H2, H3, H4 } from './Headings.jsx'
 export { default as Image, Images } from './Image.jsx'
 export { default as Link, Links } from './Link.jsx'
 export { default as List, Lists } from './List.jsx'
+export { default as TableOfContents } from './TableOfContents.jsx'
 
 export {
     convertMillimetersToTwip,

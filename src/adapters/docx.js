@@ -40,6 +40,7 @@ import {
     AlignmentType,
     PageNumber,
     NumberFormat,
+    TableOfContents as DocxTableOfContents,
 } from 'docx'
 
 // ============================================================================
@@ -210,9 +211,30 @@ async function irToSectionChildrenAsync(node) {
             return [await irToTableAsync(node)]
         case 'image':
             return [await irToImageParagraph(node)]
+        case 'tableOfContents':
+            return [irToTableOfContents(node)]
         default:
             return [await irToParagraphAsync(node)]
     }
+}
+
+/**
+ * Convert a `tableOfContents` IR node into a docx TableOfContents
+ * instance. The node's `toc` sub-object carries the options set via
+ * data-toc-* attributes on the Press <TableOfContents> builder.
+ *
+ * See https://docx.js.org/#/usage/table-of-contents and the library's
+ * ITableOfContentsOptions interface for the full set of options.
+ */
+function irToTableOfContents(node) {
+    const opts = node.toc || {}
+    const title = opts.title || 'Contents'
+    const tocOptions = {
+        hyperlink:
+            opts.hyperlink === 'true' || opts.hyperlink === true || opts.hyperlink == null,
+        headingStyleRange: opts.headingRange || '1-3',
+    }
+    return new DocxTableOfContents(title, tocOptions)
 }
 
 /**
@@ -239,6 +261,9 @@ function irToParagraph(node) {
     }
     if (node.style) {
         options.style = node.style
+    }
+    if (node.pageBreakBefore) {
+        options.pageBreakBefore = true
     }
     if (node.spacing) {
         options.spacing = {}

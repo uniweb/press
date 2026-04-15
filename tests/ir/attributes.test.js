@@ -40,14 +40,21 @@ describe('setPath', () => {
 })
 
 describe('attributeMap', () => {
-    it('covers every attribute from the legacy switch statement', () => {
+    it('covers every attribute from the legacy switch plus Press extensions', () => {
         // Canary: if someone adds or removes an attribute, this test updates
-        // deliberately. Matches the count from report-sdk/src/utils.js:223-410.
-        // 1 underline + 3 positionaltab + 2 spacing + 2 transformation
-        // + 1 bullet + 3 numbering + 3 alttext + 2 width + 4 margins
-        // + 12 borders + 1 image-type + 6 floating = 40 entries.
+        // deliberately.
+        //
+        // Legacy (report-sdk/src/utils.js:223-410) — 40 entries:
+        //   1 underline + 3 positionaltab + 2 spacing + 2 transformation
+        //   + 1 bullet + 3 numbering + 3 alttext + 2 width + 4 margins
+        //   + 12 borders + 1 image-type + 6 floating = 40.
+        //
+        // Press-native additions (not in legacy):
+        //   + 1 data-page-break-before    (Slice 6)
+        //   + 3 data-toc-*                (Slice 6 — TOC builder options)
+        //   = 44 total.
         const keys = Object.keys(attributeMap)
-        expect(keys).toHaveLength(40)
+        expect(keys).toHaveLength(44)
     })
 
     it('does not contain data-type', () => {

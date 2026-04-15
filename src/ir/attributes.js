@@ -27,6 +27,9 @@
 /** Transform used by presence-only attributes like data-underline. */
 const asEmptyObject = () => ({})
 
+/** Transform used by boolean presence attributes like data-page-break-before. */
+const asTrue = () => true
+
 /**
  * Explicit attribute → IR path mapping. Entries are listed in the same
  * order as the legacy switch for ease of cross-reference.
@@ -95,6 +98,19 @@ export const attributeMap = {
     'data-floating-verticalposition-offset': {
         path: ['floating', 'verticalPosition', 'offset'],
     },
+
+    // Page breaks — maps to DocxParagraph({ pageBreakBefore: true })
+    // in the adapter. Presence attribute: any truthy value counts.
+    'data-page-break-before': { path: ['pageBreakBefore'], transform: asTrue },
+
+    // Table of contents options — consumed by the tableOfContents node
+    // type in the adapter (src/adapters/docx.js). See docx library's
+    // ITableOfContentsOptions for the full shape; these are the three
+    // useful ones and any additional data-toc-* attribute falls through
+    // to the default rule below.
+    'data-toc-title': { path: ['toc', 'title'] },
+    'data-toc-hyperlink': { path: ['toc', 'hyperlink'] },
+    'data-toc-heading-range': { path: ['toc', 'headingRange'] },
 }
 
 /**

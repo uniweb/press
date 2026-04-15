@@ -498,3 +498,104 @@ describe('document metadata (title, creator, ...)', () => {
         expect(coreXml).toContain('Faculty Annual Report')
     })
 })
+
+// ============================================================================
+// Slice 6: page breaks and table of contents
+// ============================================================================
+
+describe('data-page-break-before', () => {
+    it('produces a pageBreakBefore property on the paragraph via attribute', async () => {
+        const ir = htmlToIR(
+            '<p data-type="paragraph" data-page-break-before="true">Fresh page</p>',
+        )
+        const doc = await buildDocument({ sections: [ir] })
+        const xml = await readDocumentXml(doc)
+
+        // The docx library renders pageBreakBefore as <w:pageBreakBefore/>
+        // inside the paragraph's <w:pPr> properties block.
+        expect(xml).toContain('<w:pageBreakBefore')
+        expect(xml).toContain('Fresh page')
+    })
+
+    it('produces a pageBreakBefore property on a directly-constructed IR node', async () => {
+        const doc = await buildDocument({
+            sections: [
+                [
+                    {
+                        type: 'paragraph',
+                        pageBreakBefore: true,
+                        children: [{ type: 'text', content: 'Start of chapter' }],
+                    },
+                ],
+            ],
+        })
+        const xml = await readDocumentXml(doc)
+        expect(xml).toContain('<w:pageBreakBefore')
+    })
+
+    it('does not emit pageBreakBefore for paragraphs without the attribute', async () => {
+        const ir = htmlToIR('<p data-type="paragraph">No break here</p>')
+        const doc = await buildDocument({ sections: [ir] })
+        const xml = await readDocumentXml(doc)
+
+        // Scope the assertion to the body paragraph we just inserted,
+        // so any default header/footer content can't false-positive.
+        const bodyIdx = xml.indexOf('No break here')
+        expect(bodyIdx).toBeGreaterThan(-1)
+        const pStart = xml.lastIndexOf('<w:p ', bodyIdx)
+        const fragment = xml.slice(pStart, bodyIdx)
+        expect(fragment).not.toContain('<w:pageBreakBefore')
+    })
+})
+
+describe('tableOfContents node type', () => {
+    it('emits a w:sdt block (the docx TOC field) with a custom title', async () => {
+        const ir = htmlToIR(
+            '<div data-type="tableOfContents" data-toc-title="Contents" data-toc-hyperlink="true" data-toc-heading-range="1-3"></div>',
+        )
+        const doc = await buildDocument({ sections: [ir] })
+        const xml = await readDocumentXml(doc)
+
+        // A Word TOC field lives inside <w:sdt>...</w:sdt> (structured
+        // document tag), with the alias as the tag label.
+        expect(xml).toContain('<w:sdt>')
+        expect(xml).toContain('Contents')
+        // The TOC field instruction encodes the heading range via the
+        // \\o "1-3" switch — verify the switch survives the pipeline.
+        expect(xml).toContain('\\o')
+        expect(xml).toContain('1-3')
+    })
+
+    it('accepts a directly-constructed IR node with a toc options sub-object', async () => {
+        const doc = await buildDocument({
+            sections: [
+                [
+                    {
+                        type: 'tableOfContents',
+                        toc: {
+                            title: 'Table of Contents',
+                            hyperlink: 'true',
+                            headingRange: '2-4',
+                        },
+                    },
+                ],
+            ],
+        })
+        const xml = await readDocumentXml(doc)
+        expect(xml).toContain('<w:sdt>')
+        expect(xml).toContain('Table of Contents')
+        expect(xml).toContain('2-4')
+    })
+
+    it('defaults the title, hyperlink, and heading range when the toc sub-object is missing', async () => {
+        const doc = await buildDocument({
+            sections: [[{ type: 'tableOfContents' }]],
+        })
+        const xml = await readDocumentXml(doc)
+        // The defaults from irToTableOfContents: title="Contents",
+        // hyperlink=true, headingRange="1-3".
+        expect(xml).toContain('<w:sdt>')
+        expect(xml).toContain('Contents')
+        expect(xml).toContain('1-3')
+    })
+})
