@@ -1,9 +1,9 @@
 # Faculty Annual Report — modern docusite template
 
-**Status:** requirements, awaiting review.
+**Status:** approved; open questions answered. Ready for Slice 0.
 **Author:** Claude.
 **Last updated:** 2026-04-15.
-**Scope:** a single reference foundation + test site that replaces the legacy UNB/SMU faculty-annual-report foundations with a modern **docusite** — a Uniweb site whose pages are also a downloadable `.docx` document.
+**Scope:** a single reference foundation + test site that replaces the legacy UNB/SMU faculty-annual-report foundations with a modern **docusite** — a Uniweb URL whose content is also a downloadable `.docx` document.
 
 This is a forward-looking design. It grows out of the R5 legacy parity audit (`../audits/2026-04-legacy-parity.md`) but is not bound by the legacy implementation; the goal is *same or better output, using modern concepts*, not a 1:1 code port.
 
@@ -25,10 +25,11 @@ Concretely, the deliverables are:
 
 ## 2. What a docusite is
 
-A Uniweb site that is *also* a downloadable document. Every page in the site corresponds to a section in the downloaded file. The same content powers both renderings. The user reads it on the web and downloads the same information as a `.docx` (or `.xlsx`, `.pdf`, anything Press supports).
+A Uniweb URL whose content is *also* a downloadable document. **This is not an academic website in the general sense** — it's a dynamic document that happens to have a URL, can be rendered in a browser, and can be previewed in an iframe. Every page in the docusite corresponds to a section in the downloaded file. The same content powers both renderings. The user reads it on the web and downloads the same information as a `.docx` (or `.xlsx`, `.pdf`, anything Press supports).
 
 This is a generalization of the legacy "report foundation" pattern, cleaned up and formalized. Key properties:
 
+- **The docusite is a document-with-a-URL, not a website-with-a-download-button.** Navigation, hero sections, footers, marketing pages, blog patterns — all the machinery of a general-purpose website — are absent. The sandbox base template should be the minimal **`starter`**, not `academic` or anything heavier. Every section type we build exists to serve the downloadable document.
 - **Dual representation.** Every section renders a React preview *and* registers a docx fragment via `useDocumentOutput`. The preview is the browsing experience; the fragment is the downloadable file. They may share JSX (Press builder components doing double duty) or diverge (Kit + design for the preview, Press builders for the compiled output, with the same underlying data).
 - **Download-time parameterization.** A user can change *what goes in the download* without changing the content — filter by date range, swap citation style, include or omit sections, customize recipient info for a cover letter. These are **download-time options**, scoped to the docusite and orthogonal to the site's content.
 - **Preview can be richer than the download.** Tooltips, filters, expandable cards, animated charts — things that only make sense on a screen — live in the preview only. The download flattens them to static representations or omits them entirely.
@@ -37,13 +38,38 @@ This is a generalization of the legacy "report foundation" pattern, cleaned up a
 
 The term "docusite" is new here. If a better name emerges, use it; the concept is the contribution.
 
-## 3. The test CV — "Jane Researcher"
+## 3. The test CV — Charles Darwin
 
-A fictional faculty member whose data drives the test site. The profile is chosen to stress every section type:
+The test profile is **Charles Darwin**, loosely modernized so the CV shape fits a contemporary faculty annual report while the data itself stays rooted in the historical record. Using a beloved and instantly recognizable researcher makes the test fun to work with and easy to verify — a reader can glance at a generated report and immediately tell whether the Galápagos work landed in the right section.
 
-- Mid-career in a STEM field, enough history to have depth in every category.
-- Deliberately broad: publications across journals and conferences, grants as PI and co-I, teaching undergraduate + graduate, service at department and national levels, a few named awards.
-- Anonymized enough that it's obviously fictional, realistic enough that the report looks like a real document.
+Darwin's real historical life doesn't map cleanly onto modern academic categories — he was an independent gentleman-scholar, not a faculty member. The test CV resolves this by keeping the real work (publications, awards, Royal Society involvement, the Beagle voyage) and gently anachronizing the framing (giving him "positions", "teaching", "service") just enough to exercise every section type. It's deliberately playful — a feature, not a bug.
+
+**Real Darwin material used throughout:**
+
+- **Publications.** His actual books and papers. The well-known ones: *Journal of Researches* (1839), *The Structure and Distribution of Coral Reefs* (1842), *Geological Observations on South America* (1846), *On the Origin of Species* (1859), *The Descent of Man* (1871), *The Expression of the Emotions in Man and Animals* (1872). **Plus his later plant work**, which is less famous but real and well-documented: *Insectivorous Plants* (1875), *The Movements and Habits of Climbing Plants* (1875), *The Different Forms of Flowers on Plants of the Same Species* (1877), *The Power of Movement in Plants* (1880), *The Formation of Vegetable Mould through the Action of Worms* (1881). Target: ~20 entries total across books and papers, all real, formatted as CSL-JSON.
+- **Employment.** Real: naturalist on HMS Beagle (1831–1836), then independent scholar at Down House. In the test CV these become modern "positions" with start/end dates.
+- **Education.** Real: Cambridge BA (1831), abandoned medical degree at Edinburgh (1825–1827).
+- **Awards.** Real: Royal Medal (1853), Wollaston Medal (1859), Copley Medal (1864), Baly Medal (1879).
+- **Service.** Real: Royal Society fellowship, Geological Society, Linnean Society, Zoological Society. In the test CV these become modern "service" entries with roles and date ranges.
+- **Funding.** Not a modern concept for Darwin. Fictionalized as plausible research expenses from his notebooks and estate — e.g., "Glass-house construction, Down House (1862–1863)" for the plant experiments. Keeps the ResearchFunding section exercised without pretending.
+- **Teaching.** Darwin didn't teach. The section is either omitted (demonstrates download-time section inclusion, slice 7) or fictionalized as Cambridge tutoring and public lectures. Decide during slice 5.
+
+### Loom use
+
+Per open question 5, the test CV exercises **`@uniweb/loom`** in at least one section. The natural place is the Cover or the Publications counts. Examples the sandbox should demo:
+
+```markdown
+# Annual report: {personal.first_name} {personal.family_name}
+
+During the period {dateRange.start} to {dateRange.end}, {personal.first_name} published
+{COUNT OF publications} works — {COUNT OF publications WHERE refereed} of them refereed —
+and was awarded {TOTAL OF funding.amount AS currency GBP} in research support
+across {COUNT OF funding} grants.
+```
+
+Loom resolves the placeholders against the collections-derived content. The foundation's content handler calls `instantiateContent(content, loom, vars)` per `@uniweb/loom`'s `instantiateContent` API before Press sees the content, so Press compiles a fully-resolved tree without any placeholder awareness. This demonstrates the docusite pattern composing cleanly with Loom upstream.
+
+### Data layout
 
 ### Data layout
 
@@ -52,28 +78,37 @@ The CV lives in the site package as a set of **YAML collections**, declared in `
 ```
 site/
 ├── collections/
-│   ├── personal/        ← one file, the faculty member's basic info
-│   │   └── jane.md
-│   ├── education/       ← N items, each a degree
-│   │   ├── phd.md
-│   │   ├── msc.md
-│   │   └── bsc.md
-│   ├── employment/      ← N items, each a position
-│   │   ├── associate-professor.md
-│   │   ├── assistant-professor.md
-│   │   └── postdoc.md
-│   ├── funding/         ← N items, each a grant
-│   │   ├── nsf-2024.md
-│   │   ├── nih-2022.md
-│   │   └── foundation-2021.md
-│   ├── publications/    ← N items in CSL-JSON shape
-│   │   ├── ...
-│   ├── teaching/        ← N items, each a course taught
-│   │   ├── ...
-│   ├── service/         ← N items, each a service activity
-│   │   ├── ...
-│   └── awards/          ← N items, each an award
-│       ├── ...
+│   ├── personal/        ← one file, Darwin's basic info
+│   │   └── darwin.md
+│   ├── education/       ← 2-3 items (Edinburgh, Cambridge)
+│   │   ├── cambridge.md
+│   │   └── edinburgh.md
+│   ├── employment/      ← 2 items (Beagle, Down House)
+│   │   ├── beagle-naturalist.md
+│   │   └── down-house.md
+│   ├── funding/         ← 4-6 items (plausible historical expenses)
+│   │   ├── glass-house-1862.md
+│   │   ├── beagle-publications-1839.md
+│   │   └── ...
+│   ├── publications/    ← ~20 items in CSL-JSON shape (real Darwin works)
+│   │   ├── origin-of-species-1859.md
+│   │   ├── insectivorous-plants-1875.md
+│   │   ├── climbing-plants-1875.md
+│   │   ├── different-forms-of-flowers-1877.md
+│   │   ├── power-of-movement-in-plants-1880.md
+│   │   ├── worms-1881.md
+│   │   └── ...
+│   ├── teaching/        ← optional; decided at slice 5
+│   │   └── ...
+│   ├── service/         ← Royal Society, Linnean, Geological, etc.
+│   │   ├── royal-society-fellow.md
+│   │   ├── geological-society.md
+│   │   └── ...
+│   └── awards/          ← Royal Medal, Wollaston, Copley, Baly
+│       ├── royal-medal-1853.md
+│       ├── wollaston-1859.md
+│       ├── copley-1864.md
+│       └── baly-1879.md
 ├── pages/
 │   └── report/          ← the report page (one page, many sections)
 │       ├── cover.md
@@ -97,109 +132,123 @@ Target volume: ~20 publications, ~6 grants, ~10 courses, ~15 service entries, ~5
 
 Each collection uses a small, discoverable set of fields. Drafted below; refined in implementation.
 
-**`personal/jane.md`:**
+**`personal/darwin.md`:**
 ```yaml
 ---
-name: Jane Researcher
-title: Associate Professor
-department: Computer Science
-institution: University of Example
-email: jane@example.edu
-orcid: 0000-0000-0000-0000
-website: https://example.edu/~jane
+first_name: Charles
+family_name: Darwin
+title: Naturalist and Independent Researcher
+affiliation: Down House, Kent
+email: charles@example.org
+born: 1809-02-12
 ---
 ```
 
-**`education/phd.md`:**
+**`education/cambridge.md`:**
 ```yaml
 ---
-degree: Ph.D. in Computer Science
-institution: Example State University
-advisor: Prof. Advisor Name
-year: 2015
-thesis: A modern approach to example-driven research
+degree: Bachelor of Arts
+institution: Christ's College, University of Cambridge
+year: 1831
+field: Theology (with natural history under Henslow)
 ---
 ```
 
-**`employment/associate-professor.md`:**
+**`employment/beagle-naturalist.md`:**
 ```yaml
 ---
-title: Associate Professor
-department: Computer Science
-institution: University of Example
-start: 2021-07-01
-end: present
+title: Naturalist
+organization: HMS Beagle (voyage around the world)
+start: 1831-12-27
+end: 1836-10-02
+description: |
+  Collected specimens and geological observations across South America,
+  the Galápagos Islands, Tahiti, New Zealand, and Australia. The
+  observations formed the basis for subsequent work on species variation.
 ---
 ```
 
-**`funding/nsf-2024.md`:**
+**`funding/glass-house-1862.md`:**
 ```yaml
 ---
-title: Principled approaches to example-driven reporting
-agency: National Science Foundation
-program: Example Research Program
+title: Construction of heated glass-house for experimental botany
+source: Personal estate
 role: Principal Investigator
-amount: 450000
-currency: USD
-start: 2024-01-01
-end: 2027-12-31
-co_investigators:
-  - name: Dr. Co-I One
-    role: Co-Investigator
-  - name: Dr. Co-I Two
-    role: Co-Investigator
+amount: 200
+currency: GBP
+start: 1862-03-01
+end: 1863-05-01
+description: |
+  Required to extend observations of insectivorous plants and climbing
+  plants under controlled conditions. Later served experiments for
+  The Power of Movement in Plants (1880).
 ---
 ```
 
-**`publications/*.md`** — CSL-JSON frontmatter, ready for `citestyle` consumption:
+**`publications/insectivorous-plants-1875.md`** — CSL-JSON frontmatter, ready for `citestyle` consumption:
 ```yaml
 ---
-type: article-journal
-title: Structured citation output for the web
+type: book
+title: Insectivorous Plants
 author:
-  - { family: Researcher, given: Jane }
-  - { family: Colleague, given: Pat }
-issued: { date-parts: [[2024]] }
-container-title: Journal of Digital Publishing
-volume: 8
-issue: 3
-page: 123-145
-DOI: 10.1234/jdp.2024.001
+  - { family: Darwin, given: Charles }
+issued: { date-parts: [[1875]] }
+publisher: John Murray
+publisher-place: London
+refereed: false
 ---
 ```
 
-Publications use the exact CSL-JSON field names so they can be fed to `citestyle`'s `formatAll(style, items)` directly without a transform.
-
-**`teaching/cs101.md`:**
+**`publications/origin-of-species-1859.md`:**
 ```yaml
 ---
-code: CS 101
-title: Introduction to Computer Science
-level: undergraduate
-term: fall
-year: 2024
-enrollment: 85
-evaluation: 4.2
+type: book
+title: On the Origin of Species by Means of Natural Selection
+author:
+  - { family: Darwin, given: Charles }
+issued: { date-parts: [[1859]] }
+publisher: John Murray
+publisher-place: London
+refereed: false
 ---
 ```
 
-**`service/dept-curriculum-committee.md`:**
+Publications use the exact CSL-JSON field names so they can be fed to `citestyle`'s `formatAll(style, items)` directly without a transform. The `refereed` field is a foundation-level convention (not CSL-JSON) used by Loom expressions and filter logic; citestyle ignores it.
+
+**`teaching/naturalist-course-1832.md`** (fictionalized):
 ```yaml
 ---
-role: Member
-organization: Department Curriculum Committee
-type: department
-start: 2022-09-01
-end: present
+code: NAT-300
+title: Field Methods in Natural History
+term: voyage
+year: 1832
+level: apprentice
+description: |
+  Practical instruction in specimen collection and preservation
+  during the Beagle voyage, delivered to the ship's crew.
 ---
 ```
 
-**`awards/best-paper.md`:**
+**`service/royal-society-fellow.md`:**
 ```yaml
 ---
-title: Best Paper Award
-organization: International Example Conference
-year: 2023
+role: Fellow
+organization: Royal Society of London
+type: external
+start: 1839-01-24
+end: 1882-04-19
+---
+```
+
+**`awards/copley-medal-1864.md`:**
+```yaml
+---
+title: Copley Medal
+organization: Royal Society of London
+year: 1864
+description: |
+  Awarded for "important researches in geology, zoology, and botanical
+  physiology, as contained in his various works".
 ---
 ```
 
@@ -209,8 +258,8 @@ Nine core section types plus a layout and a cover. Each table row covers: name, 
 
 | Section | Data source | Preview | Docx output | Press features used |
 |---|---|---|---|---|
-| **Cover** | `site.yml` + `personal/jane.md` | Full-bleed title slide with name, title, institution, date range | Title page with metadata for Word (title, creator, subject) | `H1`, `Paragraph`, `compile` options → Word metadata |
-| **PersonalInfo** | `personal/jane.md` | Compact card with photo, contact info, links | Formal header block with name, title, department, email | `H1`/`H2`, `Paragraph` with inline marks |
+| **Cover** | `site.yml` + `personal/darwin.md` | Title slide with name, affiliation, date range | Title page with metadata for Word (title, creator, subject) | `H1`, `Paragraph`, `compile` options → Word metadata |
+| **PersonalInfo** | `personal/darwin.md` | Compact card with portrait, contact info, links | Formal header block with name, title, affiliation | `H1`/`H2`, `Paragraph` with inline marks |
 | **Education** | `collections/education/*` | Timeline or vertical list | Chronological list, newest first, one paragraph per degree | `H2`, `Paragraphs`, probably a new `<DefinitionList>` or hanging-indent pattern |
 | **Employment** | `collections/employment/*` | Timeline or vertical list | Chronological list, date + title on left, institution on right | Same as Education |
 | **ResearchFunding** | `collections/funding/*` + date filter | Sortable/filterable table with totals | Table with date range, title/org, amount columns; grouped by role | Table vocabulary (cell widths, margins, borders) — already supported, this is the R5 mechanical-port validation |
@@ -361,7 +410,7 @@ vars:
 
 The foundation's docx output reads these vars at compile time (in a content handler that runs before registrations) and passes them through to `compile('docx', { paragraphStyles, sectionProperties })`. This keeps per-tenant branding in the site, where it belongs.
 
-Two example `theme.yml` variants ship alongside the test site — one "UNB-ish" (red/black), one "SMU-ish" (maroon/gold) — to demonstrate that one foundation can serve multiple tenants through theme alone.
+Two example `theme.yml` variants ship alongside the test site — one sober (classic serif, navy + cream, the "formal Victorian" look suited to Darwin), one modern (sans-serif, primary-coloured accents) — to demonstrate that one foundation can serve multiple tenants through theme alone.
 
 ## 8. Modern primitives used
 
@@ -423,7 +472,7 @@ Plus tests for each. No visible foundation yet.
 2. Rename it to `faculty-annual-report`, strip it down to a minimal foundation + site.
 3. Add the first two section types — `Cover` and `PersonalInfo` — each with a React preview and a docx registration.
 4. Add a minimal `ReportLayout` that wraps the page in a `<DocumentProvider>`, plus a crude download button (no options form yet).
-5. Add the `collections/personal/jane.md` file and wire `PersonalInfo` to read from it.
+5. Add the `collections/personal/darwin.md` file and wire `PersonalInfo` to read from it.
 6. `pnpm dev` shows the report; clicking Download produces a two-page `.docx` with the cover and personal info.
 
 Exit: visible output, valid docx, pipeline proven.
@@ -491,7 +540,7 @@ Exit: proves one foundation serves multiple tenants through theme alone.
 
 ### Slice 9 — visual review vs legacy
 
-1. Generate the report against Jane Researcher with the default theme.
+1. Generate the report against Charles Darwin with the default theme.
 2. Generate a legacy report against the same data (if a legacy environment can be stood up — the R5 audit flagged this as blocked on setup; the backup plan is visual review of the modern output alone against a reference PDF of what a legacy report used to look like).
 3. Classify every visible difference. Fix regressions, accept improvements.
 
@@ -522,17 +571,19 @@ Exit: shipped.
 - **Not a Press architectural spec.** Press changes are tracked in their own commits and the restructure plan. Slice 0 is the only place Press gets touched in this project.
 - **Not a per-section implementation spec.** Each slice decides its own component internals; this doc only fixes the inputs and outputs.
 - **Not a legacy feature checklist.** R5's legacy audit has the complete inventory. Parity is a goal; feature-by-feature matching is not a requirement. If a legacy feature has no modern justification, we drop it.
-- **Not a final naming commitment.** "docusite", "Faculty Annual Report", "Jane Researcher" are all drafts. Rename freely.
+- **Not a final naming commitment.** "docusite" as a term is a draft; Faculty Annual Report is the template name but the user-facing copy can evolve; Darwin is the test subject, chosen for fun and ease of verification.
 
-## 13. Open questions
+## 13. Decisions (all resolved)
 
-1. **Template name** — `faculty-annual-report` is a working title. Final name? Options: `academic-report`, `cv-report`, `research-report`, `docusite-cv`. My lean: **`faculty-annual-report`** (specific enough to be honest; generic enough to serve adjacent use cases).
-2. **Sandbox base template** — start from `academic`, `dynamic`, `docs`, or scratch? My lean: **`academic`**, because it already has `ProfileHero` + `PublicationList` + `Timeline` section types that overlap conceptually with what we need.
-3. **Fictional name** — "Jane Researcher" is placeholder. Good? Or pick something more memorable (e.g., "Dr. Ada Mercer")? No strong opinion.
-4. **Publications source data** — hand-author ~20 fictional publications (realistic citations, fictional titles/authors) or import from a public CSL-JSON test set (shared with other projects)? My lean: **hand-author**, tuned to stress citestyle.
-5. **Loom use in the test CV** — Should the test exercise Loom content handlers (e.g., `{SHOW publications.title WHERE refereed SORTED BY year DESCENDING}` expressions in the markdown), or is the foundation built on static `content.data` only? My lean: **include one Loom example** somewhere (maybe the Cover page or the Education section) so the docusite pattern is visibly composable with Loom.
-6. **Options form placement** — as a `<DocumentOptionsPanel>` in the page header, a popover from the Download button, or a sidebar? My lean: **popover from the Download button** for the default, with the panel exposed as a reusable component for foundations that want it elsewhere.
-7. **Downloaded file name** — fixed (`faculty-annual-report.docx`) or computed (`jane-researcher-2020-2025.docx`)? My lean: **computed**, using the personal name and date range from download options.
-8. **What lives in `press/docs/projects/`** long term. This is the first file under `projects/`. Do we keep using this folder for forward-looking specs that aren't Press architectural designs, or find a better home?
+All eight open questions have been answered. Recorded here for the execution record.
 
-Answer these — or tell me to proceed with my leans — and slice 0 starts next.
+1. **Template name:** `faculty-annual-report`. ✓
+2. **Sandbox base:** **`starter`**, not `academic`. The docusite is a document-with-a-URL, not a general-purpose website. The heavy academic template would need to be stripped of nav, hero, marketing patterns, etc. — starting from `starter` (one generic `Section` type, two trivial pages) is cleaner. ✓
+3. **Test subject:** **Charles Darwin**, using real historical data lightly anachronized to fit a modern faculty annual report. ✓
+4. **Publications source:** **Real Charles Darwin works**, including his later plant studies (*Insectivorous Plants*, *Climbing Plants*, *Different Forms of Flowers*, *Power of Movement in Plants*, *Worms*) alongside the better-known *Origin*, *Descent*, *Journal of Researches*, etc. All fields in CSL-JSON. ✓
+5. **Loom use:** **Yes** — the test CV exercises Loom in at least one section, preferably the Cover (counts and totals) or Publications (filter expressions). Demonstrates the docusite pattern composes cleanly with Loom upstream. ✓
+6. **Options form placement:** **Popover from the Download button** (default); the panel is also exposed as a reusable component for foundations that want to place it elsewhere. ✓
+7. **Downloaded file name:** **Computed** from personal name and date range. E.g., `charles-darwin-1859-1881.docx`. ✓
+8. **`press/docs/projects/`** folder: **keep**. First file under this category; future forward-looking specs that aren't Press architectural designs land here too. ✓
+
+Slice 0 — Press P1 changes — starts next.
