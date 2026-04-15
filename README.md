@@ -19,6 +19,23 @@ Press is the output layer of that system. It gives foundations:
 
 The core is **format-agnostic**. Press ships a docx toolkit today, and xlsx and pdf toolkits are on the roadmap. But you can use Press right now to generate any format you want by writing your own adapter against `@uniweb/press/ir`. Press is a framework for alternate outputs; the docx toolkit is one implementation of it.
 
+## Ways to use it
+
+Press doesn't prescribe what the site is *for*. Three shapes are all first-class, and you pick based on what you're building. See [concepts](./docs/concepts.md) for the full discussion.
+
+**1. Interactive report + downloads.** A live web document — navigable, themed, possibly with dynamic data and Loom-instantiated content — that also offers one or more download buttons. Readers browse on screen; those who need a file click Download. This is the flagship case for annual reports, CVs, program guides, and anything else that wants to exist as both a URL and a document.
+
+**2. Multi-format exports.** The same site registers fragments for several formats at once — docx for the narrative, xlsx for the tabular data, a custom JSON export for machine consumers. Each section chooses which formats it contributes to. Compilation is per-format and lazy: a user clicks "Download xlsx" and only the xlsx adapter loads.
+
+**3. Headless export.** Sections register fragments and return `null`. The site has no visible output — it exists purely as a compile target for an automated pipeline, an admin tool, or a generator UI whose only job is to produce files. Press works here because registration is decoupled from rendering; a component that returns `null` still contributes to `compile()`.
+
+For cases 1 and 2, you also choose **how the preview works**:
+
+- **JSX-as-preview (recommended).** Press's `/docx` builder components emit ordinary HTML (`<p>`, `<h1>`, `<span>` with `data-*` attributes). The exact same JSX serves as the browser preview *and* as the source the compile pipeline walks. One tree, zero drift, no extra library. Your section is already rendering JSX — using Press builders costs nothing more. You can also split: Kit components for a richer themed preview, Press builders for the registered docx fragment, mirroring the same structure.
+- **Compiled-blob preview via `docx-preview`.** Instead of previewing the *content*, preview the *compiled file*. Render whatever you want (or nothing) in the component, then feed the Blob from `compile('docx')` into [`docx-preview`](https://github.com/VolodymyrBaydalka/docxjs) inside a sandboxed iframe to see Word's actual formatting. Useful as a cross-check view or when the downloaded file's exact appearance matters more than a browseable web view. Pays the `docx-preview` library cost; see the [preview pattern guide](./docs/guides/preview-pattern.md).
+
+The two strategies compose — a foundation can do JSX-as-preview for normal reading and *also* offer a "Preview compiled file" button that opens the docx-preview iframe.
+
 ## Hello world
 
 A Uniweb section component that renders both a preview and a registered docx fragment from the same JSX:
