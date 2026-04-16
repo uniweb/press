@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest'
 import React from 'react'
 import ReactDOMServer from 'react-dom/server'
 import { htmlToIR } from '../../src/ir/parser.js'
+import DocumentProvider from '../../src/DocumentProvider.jsx'
 import {
     Image,
     Caption,
@@ -51,6 +52,75 @@ describe('Image (bare)', () => {
     it('renders nothing when data is missing', () => {
         const { ir } = renderToIR(<Image />)
         expect(ir).toHaveLength(0)
+    })
+})
+
+describe('Image basePath resolution', () => {
+    it('prefixes site-absolute URLs with the provider basePath', () => {
+        const { ir } = renderToIR(
+            <DocumentProvider basePath="/templates/monograph">
+                <Image data="/images/finch.png" />
+            </DocumentProvider>,
+        )
+        expect(ir[0]).toMatchObject({
+            type: 'image',
+            src: '/templates/monograph/images/finch.png',
+        })
+    })
+
+    it('leaves external URLs untouched', () => {
+        const { ir } = renderToIR(
+            <DocumentProvider basePath="/docs">
+                <Image data="https://cdn.example.com/logo.png" />
+            </DocumentProvider>,
+        )
+        expect(ir[0]).toMatchObject({ src: 'https://cdn.example.com/logo.png' })
+    })
+
+    it('leaves protocol-relative URLs untouched', () => {
+        const { ir } = renderToIR(
+            <DocumentProvider basePath="/docs">
+                <Image data="//cdn.example.com/logo.png" />
+            </DocumentProvider>,
+        )
+        expect(ir[0]).toMatchObject({ src: '//cdn.example.com/logo.png' })
+    })
+
+    it('leaves relative URLs untouched', () => {
+        const { ir } = renderToIR(
+            <DocumentProvider basePath="/docs">
+                <Image data="./local.png" />
+            </DocumentProvider>,
+        )
+        expect(ir[0]).toMatchObject({ src: './local.png' })
+    })
+
+    it('does not double-prefix URLs already under basePath', () => {
+        const { ir } = renderToIR(
+            <DocumentProvider basePath="/docs">
+                <Image data="/docs/images/finch.png" />
+            </DocumentProvider>,
+        )
+        expect(ir[0]).toMatchObject({ src: '/docs/images/finch.png' })
+    })
+
+    it('renders absolute URLs verbatim when no basePath is provided', () => {
+        const { ir } = renderToIR(
+            <DocumentProvider>
+                <Image data="/images/finch.png" />
+            </DocumentProvider>,
+        )
+        expect(ir[0]).toMatchObject({ src: '/images/finch.png' })
+    })
+
+    it('propagates basePath through <Figure>', () => {
+        const { ir } = renderToIR(
+            <DocumentProvider basePath="/templates/monograph">
+                <Figure src="/images/finch.png" alt="finch" caption="A finch." />
+            </DocumentProvider>,
+        )
+        const image = ir.find((n) => n.type === 'image')
+        expect(image).toMatchObject({ src: '/templates/monograph/images/finch.png' })
     })
 })
 

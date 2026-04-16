@@ -5,6 +5,7 @@ import { render } from '@testing-library/react'
 import DocumentProvider from '../../src/DocumentProvider.jsx'
 import { useDocumentOutput } from '../../src/useDocumentOutput.js'
 import { DocumentContext } from '../../src/DocumentContext.js'
+import { BasePathContext } from '../../src/BasePathContext.js'
 
 /**
  * Helper: render a tree and return the store from the context.
@@ -34,6 +35,34 @@ describe('DocumentProvider', () => {
         expect(typeof store.register).toBe('function')
         expect(typeof store.getOutputs).toBe('function')
         expect(typeof store.clear).toBe('function')
+    })
+
+    it('exposes basePath via BasePathContext (empty by default)', () => {
+        let captured = null
+        function Capture() {
+            captured = React.useContext(BasePathContext)
+            return null
+        }
+        render(
+            <DocumentProvider>
+                <Capture />
+            </DocumentProvider>,
+        )
+        expect(captured).toBe('')
+    })
+
+    it('propagates the basePath prop to BasePathContext', () => {
+        let captured = null
+        function Capture() {
+            captured = React.useContext(BasePathContext)
+            return null
+        }
+        render(
+            <DocumentProvider basePath="/templates/monograph">
+                <Capture />
+            </DocumentProvider>,
+        )
+        expect(captured).toBe('/templates/monograph')
     })
 
     it('returns the same store across re-renders (memoized)', () => {

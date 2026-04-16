@@ -10,9 +10,14 @@
  * if blocks are unmounted and garbage-collected, their registrations don't
  * leak.
  *
+ * Optional `basePath` tells Press how to resolve site-absolute URLs (e.g.
+ * '/images/hero.png') under subdirectory deployments. Foundations pass
+ * this from their runtime (for example `website.basePath` via
+ * `useWebsite()`) — Press itself has no awareness of the host runtime.
+ *
  * Usage:
  *
- *   <DocumentProvider>
+ *   <DocumentProvider basePath={website.basePath}>
  *     <SectionComponent block={block1} />
  *     <SectionComponent block={block2} />
  *     <DownloadControls />
@@ -20,6 +25,7 @@
  */
 import { useMemo } from 'react'
 import { DocumentContext } from './DocumentContext.js'
+import { BasePathContext } from './BasePathContext.js'
 
 /**
  * @typedef {Object} OutputEntry
@@ -28,7 +34,7 @@ import { DocumentContext } from './DocumentContext.js'
  * @property {Object} [options] - Registration options (role, applyTo, etc.).
  */
 
-export default function DocumentProvider({ children }) {
+export default function DocumentProvider({ children, basePath = '' }) {
     const store = useMemo(() => {
         /** @type {WeakMap<Object, Map<string, OutputEntry>>} */
         const outputs = new WeakMap()
@@ -97,7 +103,9 @@ export default function DocumentProvider({ children }) {
 
     return (
         <DocumentContext.Provider value={store}>
-            {children}
+            <BasePathContext.Provider value={basePath || ''}>
+                {children}
+            </BasePathContext.Provider>
         </DocumentContext.Provider>
     )
 }
