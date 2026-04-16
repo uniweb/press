@@ -262,6 +262,9 @@ function irToParagraph(node) {
     if (node.style) {
         options.style = node.style
     }
+    if (node.alignment) {
+        options.alignment = toAlignment(node.alignment)
+    }
     if (node.pageBreakBefore) {
         options.pageBreakBefore = true
     }
@@ -456,6 +459,20 @@ const HEADING_LEVELS = {
 
 function toHeadingLevel(v) {
     return HEADING_LEVELS[v]
+}
+
+// --- Paragraph alignment ---
+
+const ALIGNMENTS = {
+    left: AlignmentType.LEFT,
+    center: AlignmentType.CENTER,
+    right: AlignmentType.RIGHT,
+    justified: AlignmentType.JUSTIFIED,
+    both: AlignmentType.JUSTIFIED,
+}
+
+function toAlignment(v) {
+    return ALIGNMENTS[v] ?? AlignmentType.LEFT
 }
 
 // --- Width type ---
