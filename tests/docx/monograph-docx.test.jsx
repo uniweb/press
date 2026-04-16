@@ -162,47 +162,6 @@ describe('positional tab nesting', () => {
     })
 })
 
-describe('image media extensions', () => {
-    it('stores embedded images with a real extension, not .undefined', async () => {
-        const origFetch = globalThis.fetch
-        globalThis.fetch = async () => ({
-            ok: true,
-            status: 200,
-            arrayBuffer: async () =>
-                new Uint8Array([
-                    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-                    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
-                    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-                    0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
-                    0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41,
-                    0x54, 0x78, 0x9c, 0x62, 0x00, 0x01, 0x00, 0x00,
-                    0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00,
-                    0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
-                    0x42, 0x60, 0x82,
-                ]).buffer,
-        })
-        try {
-            const html = renderToStaticMarkup(
-                <Figure src="/plate.png" alt="plate" width={100} height={100} />,
-            )
-            const ir = htmlToIR(html)
-            const doc = await buildDocument({ sections: [ir] }, STYLE_PACK)
-            const buffer = await Packer.toBuffer(doc)
-            const zip = await JSZip.loadAsync(buffer)
-            const mediaNames = Object.keys(zip.files).filter(
-                (n) => n.startsWith('word/media/') && !zip.files[n].dir,
-            )
-            expect(mediaNames.length).toBeGreaterThan(0)
-            for (const name of mediaNames) {
-                expect(name).not.toMatch(/\.undefined$/)
-                expect(name).toMatch(/\.(png|jpg|jpeg|gif|bmp|svg)$/)
-            }
-        } finally {
-            globalThis.fetch = origFetch
-        }
-    })
-})
-
 describe('drawing IDs are unique per document', () => {
     it('assigns distinct <wp:docPr id="..."> to every image', async () => {
         // Stub fetch so the adapter doesn't need real images.

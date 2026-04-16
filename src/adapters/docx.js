@@ -699,48 +699,17 @@ async function irToTableAsync(node) {
 let nextImageId = 1
 
 /**
- * Accepted image types by the docx library.
- */
-const IMAGE_TYPES = new Set(['png', 'jpg', 'jpeg', 'gif', 'bmp', 'svg'])
-
-/**
- * Detect an image type from (a) the URL's extension when it points at
- * a standard format, or (b) the magic bytes at the start of the buffer.
- * Returns a value accepted by the docx library's ImageRun (png, jpg,
- * gif, bmp, svg) and falls back to 'png' for unrecognised payloads —
- * Word is more lenient with a mismatched-but-valid content type than
- * with `.undefined`.
- */
-function detectImageType(src, buffer) {
-    const urlExt = (src || '')
-        .split(/[?#]/)[0]
-        .split('.')
-        .pop()
-        .toLowerCase()
-    if (IMAGE_TYPES.has(urlExt)) {
-        return urlExt === 'jpeg' ? 'jpg' : urlExt
-    }
-
-    const view = new Uint8Array(buffer)
-    // PNG: 89 50 4E 47
-    if (view[0] === 0x89 && view[1] === 0x50 && view[2] === 0x4e && view[3] === 0x47) {
-        return 'png'
-    }
-    // JPEG: FF D8
-    if (view[0] === 0xff && view[1] === 0xd8) return 'jpg'
-    // GIF: 47 49 46
-    if (view[0] === 0x47 && view[1] === 0x49 && view[2] === 0x46) return 'gif'
-    // BMP: 42 4D
-    if (view[0] === 0x42 && view[1] === 0x4d) return 'bmp'
-    // SVG: starts with `<` (`<?xml` or `<svg`)
-    if (view[0] === 0x3c) return 'svg'
-
-    return 'png'
-}
-
-/**
  * Convert an image IR node to a Paragraph containing an ImageRun.
  * Fetches the image data asynchronously.
+ *
+ * We deliberately do NOT pass `type` to ImageRun. Setting `type: 'png'`
+ * (or similar) makes the docx library write media files as
+ * `<hash>.png`, which intuitively should be cleaner than the library's
+ * default `<hash>.undefined`. In practice Word-for-Mac rejects the
+ * typed form as unrecoverable while accepting the `.undefined` form
+ * with a one-click repair — the exact opposite of what OOXML conformance
+ * would predict. Until that regression is understood (docx library 9.6.1
+ * at time of writing), stick with the default path.
  */
 async function irToImageParagraph(node) {
     try {
@@ -748,14 +717,12 @@ async function irToImageParagraph(node) {
         if (!src) return new DocxParagraph({})
 
         const imageData = await fetchImageData(src)
-        const type = detectImageType(src, imageData)
 
         const width = toInt(node.transformation?.width) ?? 400
         const height = toInt(node.transformation?.height) ?? 300
 
         const imageOptions = {
             data: imageData,
-            type,
             transformation: { width, height },
             // altText carries the docPr.id attribute in the docx library.
             altText: {
