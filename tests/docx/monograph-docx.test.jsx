@@ -131,6 +131,37 @@ describe('monograph compile-time validation', () => {
     })
 })
 
+describe('positional tab nesting', () => {
+    it('wraps <w:ptab> inside <w:r>, not as a bare paragraph child', async () => {
+        // Two-column header pattern used by PageBranding / DocxFooter.
+        const fragment = (
+            <Paragraph>
+                <span data-type="text" data-bold="true">Left</span>
+                <span
+                    data-type="text"
+                    data-positionaltab-alignment="right"
+                    data-positionaltab-relativeto="margin"
+                    data-positionaltab-leader="none"
+                />
+                <span data-type="text" data-italics="true">Right</span>
+            </Paragraph>
+        )
+
+        const { documentXml } = await compile(fragment)
+        // <w:ptab> must live inside <w:r>. Check that every occurrence
+        // has an <w:r> open tag before it with no </w:r> in between.
+        const matches = [...documentXml.matchAll(/<w:ptab [^>]*\/>/g)]
+        expect(matches.length).toBeGreaterThan(0)
+        for (const m of matches) {
+            const prefix = documentXml.slice(0, m.index)
+            const lastOpen = prefix.lastIndexOf('<w:r>')
+            const lastClose = prefix.lastIndexOf('</w:r>')
+            expect(lastOpen).toBeGreaterThan(-1)
+            expect(lastOpen).toBeGreaterThan(lastClose)
+        }
+    })
+})
+
 describe('drawing IDs are unique per document', () => {
     it('assigns distinct <wp:docPr id="..."> to every image', async () => {
         // Stub fetch so the adapter doesn't need real images.

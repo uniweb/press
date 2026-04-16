@@ -421,11 +421,18 @@ function irToTextRunPair(node) {
     const result = []
 
     if (node.positionalTab) {
+        // <w:ptab> must live inside <w:r> per the OOXML schema — Word
+        // flags and repairs bare paragraph-level ptabs on open. Wrap in
+        // a TextRun so the library emits `<w:r><w:ptab .../></w:r>`.
         result.push(
-            new PositionalTab({
-                alignment: toTabAlignment(node.positionalTab.alignment),
-                leader: toTabLeader(node.positionalTab.leader),
-                relativeTo: toTabRelativeTo(node.positionalTab.relativeTo),
+            new TextRun({
+                children: [
+                    new PositionalTab({
+                        alignment: toTabAlignment(node.positionalTab.alignment),
+                        leader: toTabLeader(node.positionalTab.leader),
+                        relativeTo: toTabRelativeTo(node.positionalTab.relativeTo),
+                    }),
+                ],
             }),
         )
     }
