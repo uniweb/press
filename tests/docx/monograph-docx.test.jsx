@@ -19,6 +19,7 @@ import { htmlToIR } from '../../src/ir/parser.js'
 import { buildDocument } from '../../src/adapters/docx.js'
 import {
     Paragraph,
+    Figure,
     Table,
     Tr,
     Td,
@@ -127,5 +128,45 @@ describe('monograph compile-time validation', () => {
         const nums = (numberingXml.match(/<w:num /g) || []).length
         expect(abstractNums).toBeGreaterThan(0)
         expect(abstractNums).toBe(nums)
+    })
+})
+
+describe('drawing IDs are unique per document', () => {
+    it('assigns distinct <wp:docPr id="..."> to every image', async () => {
+        // Stub fetch so the adapter doesn't need real images.
+        const origFetch = globalThis.fetch
+        globalThis.fetch = async () => ({
+            ok: true,
+            status: 200,
+            arrayBuffer: async () =>
+                // 1x1 transparent PNG
+                new Uint8Array([
+                    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+                    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+                    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+                    0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+                    0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41,
+                    0x54, 0x78, 0x9c, 0x62, 0x00, 0x01, 0x00, 0x00,
+                    0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00,
+                    0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
+                    0x42, 0x60, 0x82,
+                ]).buffer,
+        })
+        try {
+            const fragment = (
+                <>
+                    <Figure src="/a.png" alt="a" width={100} height={100} />
+                    <Figure src="/b.png" alt="b" width={100} height={100} />
+                    <Figure src="/c.png" alt="c" width={100} height={100} />
+                </>
+            )
+            const { documentXml } = await compile(fragment)
+            const ids = documentXml.match(/<wp:docPr [^>]*id="(\d+)"/g) || []
+            expect(ids.length).toBe(3)
+            const idValues = ids.map((m) => m.match(/id="(\d+)"/)[1])
+            expect(new Set(idValues).size).toBe(3)
+        } finally {
+            globalThis.fetch = origFetch
+        }
     })
 })
