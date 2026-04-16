@@ -41,6 +41,8 @@ import {
     PageNumber,
     NumberFormat,
     TableOfContents as DocxTableOfContents,
+    Bookmark,
+    FootnoteReferenceRun,
 } from 'docx'
 
 // ============================================================================
@@ -105,6 +107,17 @@ export async function buildDocument(input, options = {}) {
         ...documentMetadata
     } = options
 
+    // Pre-pass: walk every IR tree (sections, header, footer) and assign
+    // sequential footnote ids to every `footnoteReference` node, collecting
+    // their children into a footnotes map keyed by id. The IR nodes are
+    // mutated in place with `footnoteId` so the inline converter below can
+    // emit a FootnoteReferenceRun pointing at the right id. Word's footnote
+    // registry is document-level, so ids must be unique across all trees.
+    const footnotesState = { nextId: 1, footnotes: {} }
+    collectFootnotes(sections.flat(), footnotesState)
+    if (header) collectFootnotes(header, footnotesState)
+    if (footer) collectFootnotes(footer, footnotesState)
+
     // Flatten all blocks' IR trees into one array of section children.
     // Use async conversion for image support.
     const children = await convertChildren(sections.flat())
@@ -162,7 +175,56 @@ export async function buildDocument(input, options = {}) {
         docOptions.numbering = { config: numbering }
     }
 
+    if (Object.keys(footnotesState.footnotes).length) {
+        docOptions.footnotes = footnotesState.footnotes
+    }
+
     return new Document(docOptions)
+}
+
+/**
+ * Recursively walk an IR tree, assigning a sequential `footnoteId` to
+ * every node of type `footnoteReference` and collecting its children
+ * into `state.footnotes` as `[id]: { children: [Paragraph] }`. The
+ * footnote body's children are converted here (sync — footnote bodies
+ * don't support images) so the main async convertChildren pass just
+ * sees the annotated reference node and emits FootnoteReferenceRun.
+ *
+ * The ids count up from 1 across the entire document, matching Word's
+ * document-level footnote numbering.
+ */
+function collectFootnotes(nodes, state) {
+    if (!Array.isArray(nodes)) return
+    for (const node of nodes) {
+        if (!node || typeof node !== 'object') continue
+        if (node.type === 'footnoteReference') {
+            const id = state.nextId
+            state.nextId += 1
+            node.footnoteId = id
+
+            // Footnote body children must be docx Paragraph instances.
+            // Each paragraph-type IR node becomes one; anything else
+            // (raw text, hyperlinks at the top level) gets wrapped in
+            // a paragraph so the output is valid.
+            const bodyChildren = []
+            for (const child of node.children || []) {
+                if (child.type === 'paragraph') {
+                    bodyChildren.push(irToParagraph(child))
+                } else {
+                    const inline = irToInlineChildren(child)
+                    if (inline.length) {
+                        bodyChildren.push(new DocxParagraph({ children: inline }))
+                    }
+                }
+            }
+            // Word requires at least one paragraph in a footnote.
+            if (!bodyChildren.length) {
+                bodyChildren.push(new DocxParagraph({}))
+            }
+            state.footnotes[id] = { children: bodyChildren }
+        }
+        if (node.children) collectFootnotes(node.children, state)
+    }
 }
 
 /**
@@ -213,6 +275,10 @@ async function irToSectionChildrenAsync(node) {
             return [await irToImageParagraph(node)]
         case 'tableOfContents':
             return [irToTableOfContents(node)]
+        case 'webOnly':
+            // See the matching case in irToInlineChildren — a block-level
+            // webOnly subtree is dropped from the docx output.
+            return []
         default:
             return [await irToParagraphAsync(node)]
     }
@@ -288,7 +354,16 @@ function irToParagraph(node) {
     }
 
     const children = (node.children || []).flatMap(irToInlineChildren)
-    if (children.length) options.children = children
+
+    // A paragraph with data-bookmark="id" wraps its inline children in
+    // a Bookmark so InternalHyperlink({ anchor: "id" }) elsewhere in the
+    // document can jump here. The Word Bookmark is a run-level element,
+    // so it goes inside the paragraph rather than wrapping it.
+    if (node.bookmark && children.length) {
+        options.children = [new Bookmark({ id: node.bookmark, children })]
+    } else if (children.length) {
+        options.children = children
+    }
 
     return new DocxParagraph(options)
 }
@@ -313,6 +388,19 @@ function irToInlineChildren(node) {
             // Images in inline context are skipped — they need async handling
             // at the section level via irToImageParagraph.
             return []
+        case 'webOnly':
+            // `data-type="webOnly"` marks a subtree that's meaningful for the
+            // React preview but has no docx analogue — e.g., an inline
+            // anchor that lets readers jump to a bibliography entry, where
+            // the Word equivalent is a separate mechanism (footnote, field
+            // reference) emitted elsewhere. Dropping the whole subtree.
+            return []
+        case 'footnoteReference':
+            // The pre-pass (collectFootnotes) assigned the id and registered
+            // the body; here we just emit the inline reference run.
+            return node.footnoteId
+                ? [new FootnoteReferenceRun(node.footnoteId)]
+                : []
         default:
             // Unknown inline: try text extraction, then recurse children.
             if (node.content) {
@@ -402,10 +490,7 @@ function irToTableCell(node) {
     const options = {}
 
     if (node.width) {
-        options.width = {
-            size: toInt(node.width.size) ?? 0,
-            type: toWidthType(node.width.type),
-        }
+        options.width = toTableCellWidth(node.width)
     }
     if (node.margins) {
         options.margins = toIntObject(node.margins)
@@ -487,6 +572,33 @@ const WIDTH_TYPES = {
 
 function toWidthType(v) {
     return WIDTH_TYPES[v] ?? WidthType.DXA
+}
+
+/**
+ * Build a TableCell `width` option from an IR width node.
+ *
+ * OOXML ECMA-376 expects `w:w` to be in fiftieths of a percent when
+ * `w:type="pct"` (so 50% = 2500). The docx library, when given a
+ * number size with `WidthType.PERCENTAGE`, serialises it as `${n}%`
+ * (e.g. `w:w="18%"`) which Word flags as a validation error and
+ * auto-repairs on open. To get a plain-number output we multiply by
+ * 50 and pass the value as a string — that takes the library's
+ * universal-measure branch, which emits the value verbatim as a
+ * plain integer while keeping `w:type="pct"`.
+ */
+function toTableCellWidth(width) {
+    const rawSize = toInt(width.size) ?? 0
+    const t = width.type
+    if (t === 'pct' || t === 'percentage') {
+        return {
+            size: String(rawSize * 50),
+            type: WidthType.PERCENTAGE,
+        }
+    }
+    return {
+        size: rawSize,
+        type: toWidthType(t),
+    }
 }
 
 // --- Border style ---
