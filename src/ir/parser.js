@@ -50,6 +50,26 @@ export function htmlToIR(htmlString) {
 }
 
 /**
+ * HTML metadata / resource-hint elements that React 18.3+ and 19 emit
+ * alongside regular DOM (e.g. `<link rel="preload" as="image">` next to
+ * an `<img>`). They are browser-only directives with no document
+ * meaning, so the walker drops them.
+ *
+ * A foundation author who deliberately placed one of these in their
+ * JSX had a browser concern in mind — documents don't carry stylesheets
+ * or preload hints, so dropping them here is correct regardless.
+ */
+const SKIP_ELEMENTS = new Set([
+    'link',
+    'meta',
+    'script',
+    'style',
+    'base',
+    'title',
+    'noscript',
+])
+
+/**
  * Convert a single parse5 node to an IR node, an array of IR nodes
  * (for `contentWrapper`), or null (for ignored nodes).
  *
@@ -66,8 +86,11 @@ function nodeToIR(node) {
     // Skip non-element nodes (comments, doctypes, etc.).
     if (!node.tagName) return null
 
+    const tagName = node.tagName.toLowerCase()
+    if (SKIP_ELEMENTS.has(tagName)) return null
+
     const dataType = getAttr(node, 'data-type')
-    const type = dataType || node.tagName.toLowerCase()
+    const type = dataType || tagName
 
     // emptyLine: drop entirely.
     if (type === 'emptyLine') return null

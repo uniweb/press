@@ -15,8 +15,12 @@ export { default as Paragraph, Paragraphs } from './Paragraph.jsx'
 export { default as TextRun } from './TextRun.jsx'
 export { H1, H2, H3, H4 } from './Headings.jsx'
 export { default as Image, Images } from './Image.jsx'
+export { default as Caption } from './Caption.jsx'
+export { default as Figure } from './Figure.jsx'
+export { Table, Tr, Td } from './Table.jsx'
 export { default as Link, Links } from './Link.jsx'
 export { default as List, Lists } from './List.jsx'
+export { BulletList, NumberedList } from './Lists.jsx'
 export { default as TableOfContents } from './TableOfContents.jsx'
 
 export {
