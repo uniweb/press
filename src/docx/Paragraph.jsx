@@ -2,8 +2,8 @@
  * Block-level text container with optional styled string parsing.
  *
  * - Without `data`: renders children directly with data-type="paragraph".
- * - With `data`: parses the HTML string for inline marks (<strong>, <em>, <u>)
- *   and renders as styled TextRun children.
+ * - With `data`: parses the HTML string for inline marks (<strong>, <em>,
+ *   <u>) and hyperlinks (<a href="...">) and renders as styled children.
  *
  * The `as` prop changes the rendered HTML element (default: <p>).
  *
@@ -18,16 +18,29 @@ export default function Paragraph({ as: Tag = 'p', data, children, ...props }) {
 
         return (
             <Tag data-type="paragraph" {...props}>
-                {parts.map((part, i) => (
-                    <TextRun
-                        key={i}
-                        bold={part.bold}
-                        italics={part.italics}
-                        underline={!!part.underline}
-                    >
-                        {part.content}
-                    </TextRun>
-                ))}
+                {parts.map((part, i) =>
+                    part.type === 'link' ? (
+                        <a
+                            key={i}
+                            data-type="externalHyperlink"
+                            data-link={part.href}
+                            href={part.href}
+                        >
+                            <span data-type="text" data-style="Hyperlink">
+                                {part.content}
+                            </span>
+                        </a>
+                    ) : (
+                        <TextRun
+                            key={i}
+                            bold={part.bold}
+                            italics={part.italics}
+                            underline={!!part.underline}
+                        >
+                            {part.content}
+                        </TextRun>
+                    )
+                )}
             </Tag>
         )
     }
