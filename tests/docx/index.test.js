@@ -599,3 +599,185 @@ describe('tableOfContents node type', () => {
         expect(xml).toContain('1-3')
     })
 })
+
+describe('bookmarks', () => {
+    it('wraps a paragraph flagged with `bookmark` in a Word bookmark', async () => {
+        const doc = await buildDocument({
+            sections: [
+                [
+                    {
+                        type: 'paragraph',
+                        bookmark: 'ref-origin-1859',
+                        children: [{ type: 'text', content: 'Darwin, 1859.' }],
+                    },
+                ],
+            ],
+        })
+        const xml = await readDocumentXml(doc)
+        // docx emits the bookmark as <w:bookmarkStart .../> + <w:bookmarkEnd/>.
+        // The name carries the id we supplied.
+        expect(xml).toContain('<w:bookmarkStart')
+        expect(xml).toContain('w:name="ref-origin-1859"')
+        expect(xml).toContain('<w:bookmarkEnd')
+    })
+
+    it('lets an internal hyperlink point at a paragraph bookmark', async () => {
+        const doc = await buildDocument({
+            sections: [
+                [
+                    {
+                        type: 'paragraph',
+                        children: [
+                            {
+                                type: 'internalHyperlink',
+                                anchor: 'ref-origin-1859',
+                                children: [{ type: 'text', content: '(Darwin, 1859)' }],
+                            },
+                        ],
+                    },
+                    {
+                        type: 'paragraph',
+                        bookmark: 'ref-origin-1859',
+                        children: [{ type: 'text', content: 'Darwin, 1859. Origin.' }],
+                    },
+                ],
+            ],
+        })
+        const xml = await readDocumentXml(doc)
+        // The hyperlink anchor matches the bookmark name — Word can resolve
+        // the jump.
+        expect(xml).toContain('w:anchor="ref-origin-1859"')
+        expect(xml).toContain('w:name="ref-origin-1859"')
+    })
+})
+
+describe('webOnly', () => {
+    it('drops a webOnly subtree from compiled docx output', async () => {
+        const doc = await buildDocument({
+            sections: [
+                [
+                    {
+                        type: 'paragraph',
+                        children: [
+                            { type: 'text', content: 'Visible. ' },
+                            {
+                                type: 'webOnly',
+                                children: [
+                                    {
+                                        type: 'text',
+                                        content: 'THIS-SHOULD-NOT-APPEAR-IN-DOCX',
+                                    },
+                                ],
+                            },
+                            { type: 'text', content: ' Also visible.' },
+                        ],
+                    },
+                ],
+            ],
+        })
+        const xml = await readDocumentXml(doc)
+        expect(xml).toContain('Visible.')
+        expect(xml).toContain('Also visible.')
+        expect(xml).not.toContain('THIS-SHOULD-NOT-APPEAR-IN-DOCX')
+    })
+})
+
+describe('footnotes', () => {
+    it('registers footnote bodies and emits reference runs inline', async () => {
+        const doc = await buildDocument({
+            sections: [
+                [
+                    {
+                        type: 'paragraph',
+                        children: [
+                            { type: 'text', content: 'Body before. ' },
+                            {
+                                type: 'footnoteReference',
+                                children: [
+                                    {
+                                        type: 'paragraph',
+                                        children: [
+                                            {
+                                                type: 'text',
+                                                content: 'FOOTNOTE-BODY-MARKER',
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                            { type: 'text', content: ' Body after.' },
+                        ],
+                    },
+                ],
+            ],
+        })
+        const documentXml = await readDocumentXml(doc)
+        const footnotesXml = await readPartXml(doc, 'word/footnotes.xml')
+
+        // Body prose survives and the reference run lands in document.xml.
+        expect(documentXml).toContain('Body before.')
+        expect(documentXml).toContain('Body after.')
+        expect(documentXml).toContain('<w:footnoteReference')
+
+        // Footnote body lives in its own part.
+        expect(footnotesXml).toBeTruthy()
+        expect(footnotesXml).toContain('FOOTNOTE-BODY-MARKER')
+    })
+
+    it('assigns sequential ids across multiple footnote references', async () => {
+        const doc = await buildDocument({
+            sections: [
+                [
+                    {
+                        type: 'paragraph',
+                        children: [
+                            { type: 'text', content: 'First. ' },
+                            {
+                                type: 'footnoteReference',
+                                children: [
+                                    {
+                                        type: 'paragraph',
+                                        children: [{ type: 'text', content: 'ONE' }],
+                                    },
+                                ],
+                            },
+                            { type: 'text', content: ' Second. ' },
+                            {
+                                type: 'footnoteReference',
+                                children: [
+                                    {
+                                        type: 'paragraph',
+                                        children: [{ type: 'text', content: 'TWO' }],
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            ],
+        })
+        const documentXml = await readDocumentXml(doc)
+        const footnotesXml = await readPartXml(doc, 'word/footnotes.xml')
+        // Two distinct references must appear in the document body.
+        const refMatches = documentXml.match(/<w:footnoteReference/g) || []
+        expect(refMatches.length).toBe(2)
+        // Both bodies made it into the footnotes part.
+        expect(footnotesXml).toContain('ONE')
+        expect(footnotesXml).toContain('TWO')
+    })
+
+    it('does not emit a footnotes part when no references exist', async () => {
+        const doc = await buildDocument({
+            sections: [
+                [
+                    {
+                        type: 'paragraph',
+                        children: [{ type: 'text', content: 'No footnotes here.' }],
+                    },
+                ],
+            ],
+        })
+        const documentXml = await readDocumentXml(doc)
+        expect(documentXml).not.toContain('<w:footnoteReference')
+    })
+})

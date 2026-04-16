@@ -675,6 +675,23 @@ async function irToTableAsync(node) {
 }
 
 /**
+ * Monotonic counter that supplies unique drawing IDs per image.
+ *
+ * The docx library's DocProperties class instantiates its own id
+ * generator in each constructor, so every ImageRun would otherwise
+ * emit `<wp:docPr id="1">` — a document with N images collides on N
+ * identical drawing IDs and Word flags the file and auto-repairs on
+ * open. Supplying an explicit `id` (read by DocProperties) wins over
+ * the per-instance generator.
+ *
+ * A single module-level counter is fine because the id is scoped to
+ * the document only; collisions between documents don't matter. We
+ * don't reset per compile — just never hand out the same number
+ * twice in a single document's lifetime.
+ */
+let nextImageId = 1
+
+/**
  * Convert an image IR node to a Paragraph containing an ImageRun.
  * Fetches the image data asynchronously.
  */
@@ -691,10 +708,11 @@ async function irToImageParagraph(node) {
         const imageOptions = {
             data: imageData,
             transformation: { width, height },
-        }
-
-        if (node.altText) {
-            imageOptions.altText = node.altText
+            // altText carries the docPr.id attribute in the docx library.
+            altText: {
+                id: nextImageId++,
+                ...(node.altText || {}),
+            },
         }
 
         if (node.floating) {

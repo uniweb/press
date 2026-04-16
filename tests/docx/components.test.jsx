@@ -2,7 +2,16 @@ import { describe, it, expect } from 'vitest'
 import React from 'react'
 import ReactDOMServer from 'react-dom/server'
 import { htmlToIR } from '../../src/ir/parser.js'
-import { Paragraph, TextRun, H1, H2, H3, H4 } from '../../src/docx/index.js'
+import {
+    Paragraph,
+    TextRun,
+    H1,
+    H2,
+    H3,
+    H4,
+    FootnoteReference,
+    WebOnly,
+} from '../../src/docx/index.js'
 
 /**
  * Helper: render a component to static HTML, then parse to IR.
@@ -179,5 +188,51 @@ describe('full pipeline: components → IR → docx adapter', () => {
         expect(ir[2].children[0].type).toBe('tableRow')
         expect(ir[2].children[0].children).toHaveLength(2)
         expect(ir[2].children[0].children[0].type).toBe('tableCell')
+    })
+})
+
+describe('FootnoteReference', () => {
+    it('renders a span with data-type="footnoteReference"', () => {
+        const { ir, html } = renderToIR(
+            <FootnoteReference>
+                <Paragraph data="The footnote body." />
+            </FootnoteReference>,
+        )
+        expect(ir[0]).toMatchObject({ type: 'footnoteReference' })
+        // Body is rendered in the DOM but hidden — web readers don't see it.
+        expect(html).toContain('display:none')
+    })
+
+    it('carries its children through to IR as a paragraph', () => {
+        const { ir } = renderToIR(
+            <FootnoteReference>
+                <Paragraph data="Body" />
+            </FootnoteReference>,
+        )
+        expect(ir[0].children[0]).toMatchObject({ type: 'paragraph' })
+        expect(ir[0].children[0].children[0]).toMatchObject({
+            type: 'text',
+            content: 'Body',
+        })
+    })
+})
+
+describe('WebOnly', () => {
+    it('renders a span with data-type="webOnly"', () => {
+        const { ir } = renderToIR(
+            <WebOnly>
+                <a href="#ref">inline link</a>
+            </WebOnly>,
+        )
+        expect(ir[0]).toMatchObject({ type: 'webOnly' })
+    })
+
+    it('forwards arbitrary props to the wrapper span', () => {
+        const { html } = renderToIR(
+            <WebOnly className="citation-inline">
+                <a href="#ref">inline link</a>
+            </WebOnly>,
+        )
+        expect(html).toContain('class="citation-inline"')
     })
 })

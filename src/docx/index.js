@@ -22,6 +22,8 @@ export { default as Link, Links } from './Link.jsx'
 export { default as List, Lists } from './List.jsx'
 export { BulletList, NumberedList } from './Lists.jsx'
 export { default as TableOfContents } from './TableOfContents.jsx'
+export { default as FootnoteReference } from './FootnoteReference.jsx'
+export { default as WebOnly } from './WebOnly.jsx'
 
 export {
     convertMillimetersToTwip,
