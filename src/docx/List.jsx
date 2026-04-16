@@ -19,7 +19,7 @@ export default function List({ data, level = 0, ...props }) {
         const { paragraphs = [], links = [], imgs = [], images = [], lists = [] } = item
 
         return (
-            <div key={index} style={{ marginLeft: level > 0 ? '2rem' : 0 }}>
+            <div key={index} style={{ marginLeft: level > 0 ? '2rem' : 0 }} {...props}>
                 <Paragraphs
                     data={paragraphs}
                     dataProps={{

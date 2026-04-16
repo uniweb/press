@@ -18,16 +18,29 @@ function Heading({ level, data, children, ...props }) {
 
         return (
             <Tag data-type="paragraph" data-heading={`HEADING_${level}`} {...props}>
-                {parts.map((part, i) => (
-                    <TextRun
-                        key={i}
-                        bold={part.bold}
-                        italics={part.italics}
-                        underline={!!part.underline}
-                    >
-                        {part.content}
-                    </TextRun>
-                ))}
+                {parts.map((part, i) =>
+                    part.type === 'link' ? (
+                        <a
+                            key={i}
+                            data-type="externalHyperlink"
+                            data-link={part.href}
+                            href={part.href}
+                        >
+                            <span data-type="text" data-style="Hyperlink">
+                                {part.content}
+                            </span>
+                        </a>
+                    ) : (
+                        <TextRun
+                            key={i}
+                            bold={part.bold}
+                            italics={part.italics}
+                            underline={!!part.underline}
+                        >
+                            {part.content}
+                        </TextRun>
+                    )
+                )}
             </Tag>
         )
     }
