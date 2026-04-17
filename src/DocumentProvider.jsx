@@ -22,8 +22,18 @@
  *     <SectionComponent block={block2} />
  *     <DownloadControls />
  *   </DocumentProvider>
+ *
+ * Context propagation to the compile pipeline:
+ *
+ * The compile pipeline re-renders each registered fragment via
+ * renderToStaticMarkup, which starts a fresh React tree with no
+ * inherited context. DocumentProvider exposes `store.wrapWithProviders`
+ * so the pipeline can re-wrap fragments in the same provider stack
+ * they rendered under. Adding a new context that builders consume
+ * (theme, locale, …) is one line inside wrapWithProviders — the
+ * compile pipeline (src/ir/compile.js) needs no changes.
  */
-import { useMemo } from 'react'
+import { createElement, useMemo } from 'react'
 import { DocumentContext } from './DocumentContext.js'
 import { BasePathContext } from './BasePathContext.js'
 
@@ -101,16 +111,32 @@ export default function DocumentProvider({ children, basePath = '' }) {
         }
     }, [])
 
-    // Persist the current basePath on the store so the compile pipeline
-    // (which calls renderToStaticMarkup outside any React tree) can
-    // re-provide BasePathContext when it re-renders the registered
-    // fragments. Updated on every render so a prop change propagates
-    // even though the memoised store object identity stays stable.
-    store.basePath = basePath || ''
+    // Expose the provider's full context stack as a closure so the
+    // compile pipeline can re-wrap registered fragments with the same
+    // contexts they rendered under — necessary because registrations
+    // capture JSX element trees, not rendered output, and a later
+    // renderToStaticMarkup(fragment) starts outside any React tree
+    // (builders would otherwise fall back to context defaults and
+    // emit, for example, un-prefixed URLs).
+    //
+    // Reassigned on every render so prop changes (basePath and any
+    // future context values) flow through even though the store's
+    // object identity is memoised.
+    //
+    // When adding a new cross-cutting context that builders consume
+    // (theme, locale, author, …), wrap it here — the compile pipeline
+    // does not need to change.
+    const resolvedBasePath = basePath || ''
+    store.wrapWithProviders = (children) =>
+        createElement(
+            BasePathContext.Provider,
+            { value: resolvedBasePath },
+            children,
+        )
 
     return (
         <DocumentContext.Provider value={store}>
-            <BasePathContext.Provider value={store.basePath}>
+            <BasePathContext.Provider value={resolvedBasePath}>
                 {children}
             </BasePathContext.Provider>
         </DocumentContext.Provider>

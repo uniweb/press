@@ -12,10 +12,8 @@
  * invoke compileOutputs() directly via the @uniweb/press/ir subpath.
  */
 
-import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { htmlToIR } from './parser.js'
-import { BasePathContext } from '../BasePathContext.js'
 
 /**
  * Compile all registered outputs for a given format into the shape the
@@ -35,7 +33,7 @@ export function compileOutputs(store, format) {
     }
 
     // Default: HTML-based formats (docx, pdf)
-    return compileHtmlBased(outputs, store.basePath || '')
+    return compileHtmlBased(outputs, store)
 }
 
 /**
@@ -45,21 +43,22 @@ export function compileOutputs(store, format) {
  * Registered fragments are React element trees captured during the live
  * page render. renderToStaticMarkup renders them afresh here, outside
  * the React tree the page rendered in — so any context the builders
- * read (notably BasePathContext, used by <Image> / <Figure> to resolve
- * site-absolute URLs under subdirectory deployments) must be
- * re-provided now or builders would see default values and emit
+ * consume (basePath for URL resolution, and any future cross-cutting
+ * values like theme or locale) must be re-provided now. The provider
+ * itself owns that knowledge via store.wrapWithProviders, so this file
+ * stays ignorant of the specific contexts in play. Without this wrap,
+ * builders fall back to context defaults and emit, for example,
  * un-prefixed URLs that the docx adapter's fetch() then 404s on.
  */
-function compileHtmlBased(outputs, basePath) {
+function compileHtmlBased(outputs, store) {
     let header = null
     let footer = null
     const sections = []
 
+    const wrap = store.wrapWithProviders || ((x) => x)
+
     for (const { fragment, options } of outputs) {
-        const wrapped = basePath
-            ? createElement(BasePathContext.Provider, { value: basePath }, fragment)
-            : fragment
-        const html = renderToStaticMarkup(wrapped)
+        const html = renderToStaticMarkup(wrap(fragment))
         const ir = htmlToIR(html)
 
         const role = options.role || 'body'
