@@ -681,35 +681,101 @@ async function irToTableAsync(node) {
     return irToTable(node)
 }
 
-/**
- * Monotonic counter that supplies unique drawing IDs per image.
+/* ============================================================================
+ * Image emission — three independent Word-compatibility invariants.
+ * ============================================================================
  *
- * The docx library's DocProperties class instantiates its own id
- * generator in each constructor, so every ImageRun would otherwise
- * emit `<wp:docPr id="1">` — a document with N images collides on N
- * identical drawing IDs and Word flags the file and auto-repairs on
- * open. Supplying an explicit `id` (read by DocProperties) wins over
- * the per-instance generator.
+ * Producing a .docx with images that Word opens cleanly (no repair dialog,
+ * no outright rejection) requires three things the docx library does NOT
+ * enforce for us. All three must hold; violating any one surfaces as a
+ * different symptom, so they're easy to confuse. Getting only two right
+ * still produces broken files.
  *
- * A single module-level counter is fine because the id is scoped to
- * the document only; collisions between documents don't matter. We
- * don't reset per compile — just never hand out the same number
- * twice in a single document's lifetime.
- */
+ * Regression guard: tests/docx/monograph-docx.test.jsx — the
+ * 'drawing IDs are unique per document' block asserts all three.
+ *
+ * 1. UNIQUE <wp:docPr id=""> PER IMAGE
+ *    The library's DocProperties class instantiates its own id generator
+ *    in each constructor, so every ImageRun otherwise emits
+ *    <wp:docPr id="1">. A document with N images collides on N identical
+ *    drawing IDs; Word flags the file and auto-repairs on open.
+ *    Fix: supply an explicit `id` via altText — it wins over the
+ *    per-instance generator. We use a module-level monotonic counter
+ *    (`nextImageId` below). Scope is the document only, so we never
+ *    reset — just never hand out the same number twice.
+ *    Symptom if violated: Word opens with repair dialog; images survive.
+ *
+ * 2. ALWAYS EMIT `name` ON <wp:docPr>
+ *    ECMA-376 declares `name` required on CT_NonVisualDrawingProps. The
+ *    docx library's DocProperties constructor only supplies the default
+ *    `name: ''` when its argument is entirely undefined — any partial
+ *    object (`{ id }`, `{ description }`, …) skips the default and
+ *    emits <wp:docPr> without a name attribute.
+ *    Fix: always spread `{ name: '' }` into altText before merging caller
+ *    fields. Look for `name: ''` in `irToImageParagraph` — it LOOKS like
+ *    a no-op but is load-bearing. Do not remove.
+ *    Symptom if violated: Word-for-Mac refuses to open the file (hard
+ *    reject, no repair offered). Word-for-Windows tolerates it.
+ *
+ * 3. PASS A VALID `type` TO ImageRun
+ *    docx@9.x writes each image as `word/media/<hash>.<type>` and binds
+ *    the file's content-type through the `<Default Extension="...">`
+ *    entries in [Content_Types].xml (png, jpeg, jpg, gif, bmp, svg are
+ *    pre-declared). If we omit `type`, the library interpolates the
+ *    string literal 'undefined' → the ZIP entry becomes
+ *    `<hash>.undefined`, which has no content-type binding.
+ *    Fix: infer type from the URL extension, falling back to magic-byte
+ *    sniffing, then to 'png'. See `inferImageType` below.
+ *    Symptom if violated: Word opens with repair dialog ("found
+ *    unreadable content"); the repair adds a
+ *    <Default Extension="undefined" ContentType="application/octet-stream"/>
+ *    entry to rescue the file.
+ *
+ * What makes this class of bug hard to debug: each symptom looks like a
+ * generic "corrupted docx" error — and the three cross-cut (fix #1 while
+ * leaving #2 wrong and you STILL get the Mac rejection; fix #2 and #3
+ * while leaving #1 wrong and you still get repair). Diff the unzipped
+ * XML of a repaired copy against the original to see what Word added.
+ * ========================================================================= */
+
 let nextImageId = 1
+
+/**
+ * Pick the docx `type` string from the image src URL or, when the
+ * extension is missing/unknown, sniff the first bytes of the fetched
+ * image. docx@9.x's RegularImageOptions.type is 'jpg' | 'png' | 'gif'
+ * | 'bmp'; SVG has a separate options shape (with a fallback raster)
+ * that we don't handle here — SVGs fall back to the default raster
+ * type ('png') which Word will accept as an opaque container when
+ * the magic bytes don't match.
+ *
+ * See the file header for why `type` matters (invariant #3).
+ */
+function inferImageType(src, data) {
+    const ext = (src.split(/[?#]/)[0].match(/\.([a-zA-Z0-9]+)$/)?.[1] || '').toLowerCase()
+    if (ext === 'png') return 'png'
+    if (ext === 'jpg' || ext === 'jpeg') return 'jpg'
+    if (ext === 'gif') return 'gif'
+    if (ext === 'bmp') return 'bmp'
+
+    const bytes = new Uint8Array(data instanceof ArrayBuffer ? data : data?.buffer ?? data)
+    if (bytes.length >= 4) {
+        if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'png'
+        if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'jpg'
+        if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'gif'
+        if (bytes[0] === 0x42 && bytes[1] === 0x4d) return 'bmp'
+    }
+    return 'png'
+}
 
 /**
  * Convert an image IR node to a Paragraph containing an ImageRun.
  * Fetches the image data asynchronously.
  *
- * We deliberately do NOT pass `type` to ImageRun. Setting `type: 'png'`
- * (or similar) makes the docx library write media files as
- * `<hash>.png`, which intuitively should be cleaner than the library's
- * default `<hash>.undefined`. In practice Word-for-Mac rejects the
- * typed form as unrecoverable while accepting the `.undefined` form
- * with a one-click repair — the exact opposite of what OOXML conformance
- * would predict. Until that regression is understood (docx library 9.6.1
- * at time of writing), stick with the default path.
+ * See the file-header comment block for the three Word-compatibility
+ * invariants this function upholds (unique docPr id, non-null name,
+ * valid type). Do not simplify the altText spread — `name: ''` looks
+ * like a no-op but Word-for-Mac rejects the file without it.
  */
 async function irToImageParagraph(node) {
     try {
@@ -722,11 +788,12 @@ async function irToImageParagraph(node) {
         const height = toInt(node.transformation?.height) ?? 300
 
         const imageOptions = {
+            type: inferImageType(src, imageData),
             data: imageData,
             transformation: { width, height },
-            // altText carries the docPr.id attribute in the docx library.
             altText: {
                 id: nextImageId++,
+                name: '',
                 ...(node.altText || {}),
             },
         }

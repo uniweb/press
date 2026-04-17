@@ -143,6 +143,22 @@ Plain JavaScript with JSDoc comments for documentation only — no `@type` annot
 
 The IR parser uses `parse5` so it runs in Node and is unit-testable without jsdom. Faster and more standard than the legacy approach.
 
+## Gotchas
+
+### Image emission — three invariants for a Word-clean .docx
+
+Every ImageRun must satisfy all three of the following, or Word complains. The docx library does not enforce them for us, and each failure mode looks like a generic "corrupted docx" — they're easy to confuse. The big header comment above `irToImageParagraph` in `src/adapters/docx.js` enumerates them; the regression guard is in `tests/docx/monograph-docx.test.jsx`.
+
+| # | Invariant | Failure mode |
+|---|---|---|
+| 1 | `<wp:docPr id="N"/>` unique across all images in the document | Word opens with repair dialog; images survive |
+| 2 | `<wp:docPr name="..."/>` attribute always emitted (even as `""`) | Word-for-Mac refuses the file outright (no repair offered); Windows tolerates |
+| 3 | `type` passed to `ImageRun` so media writes as `<hash>.png` / `.jpg` / etc., not `<hash>.undefined` | Word opens with "found unreadable content"; repair adds an `application/octet-stream` default for the `.undefined` extension |
+
+Invariant #2 is a footgun specific to docx@9.x: `DocProperties({ id })` emits `<wp:docPr id="1"/>` with no `name` attribute because the constructor's default `name: ''` only fires when the argument is fully undefined. Any partial altText object skips that default. Our adapter always spreads `{ name: '' }` into altText before caller fields — that line looks like a no-op, do not remove.
+
+Diagnosing future Word-repair complaints: unzip the generated file, have the user open-and-save it in Word, unzip the repaired copy, and `diff -r` the two trees. Whatever Word added (content-type defaults, missing attributes, renamed parts) is what our emitter got wrong.
+
 ## Dependencies
 
 - `parse5` — HTML parser (testable in Node)
