@@ -12,8 +12,10 @@
  * invoke compileOutputs() directly via the @uniweb/press/ir subpath.
  */
 
+import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { htmlToIR } from './parser.js'
+import { BasePathContext } from '../BasePathContext.js'
 
 /**
  * Compile all registered outputs for a given format into the shape the
@@ -33,20 +35,31 @@ export function compileOutputs(store, format) {
     }
 
     // Default: HTML-based formats (docx, pdf)
-    return compileHtmlBased(outputs)
+    return compileHtmlBased(outputs, store.basePath || '')
 }
 
 /**
  * Compile HTML-based format outputs (docx, pdf).
  * JSX fragments → renderToStaticMarkup → htmlToIR → grouped by role.
+ *
+ * Registered fragments are React element trees captured during the live
+ * page render. renderToStaticMarkup renders them afresh here, outside
+ * the React tree the page rendered in — so any context the builders
+ * read (notably BasePathContext, used by <Image> / <Figure> to resolve
+ * site-absolute URLs under subdirectory deployments) must be
+ * re-provided now or builders would see default values and emit
+ * un-prefixed URLs that the docx adapter's fetch() then 404s on.
  */
-function compileHtmlBased(outputs) {
+function compileHtmlBased(outputs, basePath) {
     let header = null
     let footer = null
     const sections = []
 
     for (const { fragment, options } of outputs) {
-        const html = renderToStaticMarkup(fragment)
+        const wrapped = basePath
+            ? createElement(BasePathContext.Provider, { value: basePath }, fragment)
+            : fragment
+        const html = renderToStaticMarkup(wrapped)
         const ir = htmlToIR(html)
 
         const role = options.role || 'body'

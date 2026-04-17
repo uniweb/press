@@ -101,9 +101,16 @@ export default function DocumentProvider({ children, basePath = '' }) {
         }
     }, [])
 
+    // Persist the current basePath on the store so the compile pipeline
+    // (which calls renderToStaticMarkup outside any React tree) can
+    // re-provide BasePathContext when it re-renders the registered
+    // fragments. Updated on every render so a prop change propagates
+    // even though the memoised store object identity stays stable.
+    store.basePath = basePath || ''
+
     return (
         <DocumentContext.Provider value={store}>
-            <BasePathContext.Provider value={basePath || ''}>
+            <BasePathContext.Provider value={store.basePath}>
                 {children}
             </BasePathContext.Provider>
         </DocumentContext.Provider>

@@ -124,6 +124,48 @@ describe('Image basePath resolution', () => {
     })
 })
 
+describe('basePath survives the compile pipeline', () => {
+    // Regression: the bug where `useDocumentOutput` captured a fragment
+    // during a page render wrapped in DocumentProvider, but
+    // `compileOutputs` re-rendered the fragment via renderToStaticMarkup
+    // with no context — so <Image> fell back to BasePathContext's default
+    // ('') and emitted un-prefixed URLs. The docx adapter's `fetch()`
+    // then 404'd on every image under a subdirectory deployment.
+    it('compileOutputs re-provides BasePathContext to registered fragments', async () => {
+        const { render } = await import('@testing-library/react')
+        const { DocumentContext } = await import('../../src/DocumentContext.js')
+        const { useDocumentOutput } = await import('../../src/useDocumentOutput.js')
+        const { compileOutputs } = await import('../../src/ir/compile.js')
+
+        function ImageSection({ block }) {
+            // Fragment captured here inherits BasePathContext only as
+            // React data — the element tree, not rendered output. The
+            // compile pipeline must re-provide context when it renders.
+            const fragment = <Figure src="/images/finch.png" alt="finch" />
+            useDocumentOutput(block, 'docx', fragment)
+            return null
+        }
+
+        let store = null
+        function StoreCapture() {
+            store = React.useContext(DocumentContext)
+            return null
+        }
+        const block = {}
+
+        render(
+            <DocumentProvider basePath="/templates/monograph">
+                <StoreCapture />
+                <ImageSection block={block} />
+            </DocumentProvider>,
+        )
+
+        const { sections } = compileOutputs(store, 'docx')
+        const image = sections[0].find((n) => n.type === 'image')
+        expect(image.src).toBe('/templates/monograph/images/finch.png')
+    })
+})
+
 describe('Caption', () => {
     it('emits a paragraph IR node with style="caption"', () => {
         const { ir } = renderToIR(<Caption>Figure 1. A Galapagos finch.</Caption>)
