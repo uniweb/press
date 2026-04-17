@@ -41,6 +41,7 @@
     },
     "dependencies": {
         "docx": "^9.0.0",
+        "exceljs": "^4.4.0",
         "parse5": "^7.2.0"
     },
     "peerDependencies": {

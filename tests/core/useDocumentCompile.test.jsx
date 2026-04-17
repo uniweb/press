@@ -137,4 +137,35 @@ describe('useDocumentCompile', () => {
             }),
         ).rejects.toThrow(/Unsupported document format/)
     })
+
+    it('compile("xlsx") dispatches to the xlsx adapter and returns a valid xlsx Blob', async () => {
+        function RegisterXlsxSection({ block, title, headers, data }) {
+            useDocumentOutput(block, 'xlsx', { title, headers, data })
+            return null
+        }
+
+        const block = { id: 'metrics' }
+        const state = renderHarness(
+            <RegisterXlsxSection
+                block={block}
+                title="Totals"
+                headers={['Name', 'Count']}
+                data={[
+                    ['Alice', 3],
+                    ['Bob', 5],
+                ]}
+            />,
+        )
+
+        let blob
+        await act(async () => {
+            blob = await state.compile('xlsx', { creator: 'Uniweb' })
+        })
+
+        expect(blob).toBeInstanceOf(Blob)
+        expect(blob.type).toBe(
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        expect(await blobStartsWithPK(blob)).toBe(true)
+    })
 })

@@ -25,7 +25,7 @@ import { compileOutputs } from './ir/compile.js'
 // module exporting compile<Format>(compiledInput, documentOptions) → Blob.
 const ADAPTERS = {
     docx: () => import('./adapters/docx.js'),
-    // Phase 2: xlsx: () => import('./adapters/xlsx.js'),
+    xlsx: () => import('./adapters/xlsx.js'),
     // Phase 3: pdf:  () => import('./adapters/pdf.js'),
 }
 
