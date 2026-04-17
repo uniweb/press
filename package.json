@@ -1,6 +1,6 @@
 {
     "name": "@uniweb/press",
-    "version": "0.2.6",
+    "version": "0.2.7",
     "description": "Press your React components into downloadable files — Word, Excel, PDF. Registration-based pattern with lazy-loaded format adapters.",
     "type": "module",
     "exports": {
