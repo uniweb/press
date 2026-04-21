@@ -26,9 +26,9 @@
  */
 
 import { spawn } from 'node:child_process'
-import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, writeFile, readFile, rm, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 import { Readable } from 'node:stream'
 
 const DEFAULT_PATH = '/__press/typst/compile'
@@ -142,7 +142,11 @@ async function compileBundleWithTypst(files, { binary, extraArgs }) {
                 typeof contents === 'string'
                     ? Buffer.from(contents, 'utf8')
                     : Buffer.from(contents.buffer, contents.byteOffset, contents.byteLength)
-            await writeFile(join(dir, name), buf)
+            const filePath = join(dir, name)
+            // Support nested paths like `covers/front.png` — ensure the
+            // parent directory exists before writing.
+            await mkdir(dirname(filePath), { recursive: true })
+            await writeFile(filePath, buf)
         }
 
         const inputPath = join(dir, 'main.typ')

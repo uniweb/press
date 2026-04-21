@@ -98,7 +98,20 @@ async function compileServerSide(bundle, options = {}) {
 
     const form = new FormData()
     for (const [name, contents] of Object.entries(bundle)) {
-        form.append(name, new Blob([contents], { type: 'text/plain' }), name)
+        if (contents instanceof Blob) {
+            form.append(name, contents, name)
+        } else if (
+            contents instanceof Uint8Array ||
+            contents instanceof ArrayBuffer
+        ) {
+            form.append(
+                name,
+                new Blob([contents], { type: 'application/octet-stream' }),
+                name,
+            )
+        } else {
+            form.append(name, new Blob([contents], { type: 'text/plain' }), name)
+        }
     }
 
     let res
@@ -145,6 +158,7 @@ export function buildBundle(input, options = {}) {
         preamble = DEFAULT_PREAMBLE,
         template = DEFAULT_TEMPLATE,
         meta: metaOverride = {},
+        assets = {}, // extra bundle files (path → Uint8Array / Blob / string)
     } = options
 
     // Merge: metadata role (document-level) + options.meta (call-site override)
@@ -156,6 +170,7 @@ export function buildBundle(input, options = {}) {
         'content.typ': emitContent(sections),
         'preamble.typ': preamble,
         'template.typ': template,
+        ...assets,
     }
 }
 
