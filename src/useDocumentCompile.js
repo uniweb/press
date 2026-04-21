@@ -20,14 +20,7 @@
 import { useCallback, useContext, useState } from 'react'
 import { DocumentContext } from './DocumentContext.js'
 import { compileOutputs } from './ir/compile.js'
-
-// Dynamic-import loaders keyed by format. Each loader resolves to a
-// module exporting compile<Format>(compiledInput, documentOptions) → Blob.
-const ADAPTERS = {
-    docx: () => import('./adapters/docx.js'),
-    xlsx: () => import('./adapters/xlsx.js'),
-    // Phase 3: pdf:  () => import('./adapters/pdf.js'),
-}
+import { runCompile } from './adapters/dispatch.js'
 
 /**
  * @returns {{ compile: (format: string, documentOptions?: Object) => Promise<Blob>, isCompiling: boolean }}
@@ -43,25 +36,10 @@ export function useDocumentCompile() {
                     'useDocumentCompile: called outside of a <DocumentProvider>.',
                 )
             }
-            const adapterLoader = ADAPTERS[format]
-            if (!adapterLoader) {
-                throw new Error(`Unsupported document format: "${format}"`)
-            }
-
             setIsCompiling(true)
             try {
                 const compiled = compileOutputs(store, format)
-                const adapter = await adapterLoader()
-                const compileFn =
-                    adapter.compileDocx ||
-                    adapter.compileXlsx ||
-                    adapter.compilePdf
-                if (!compileFn) {
-                    throw new Error(
-                        `Format adapter "${format}" does not export a compile function.`,
-                    )
-                }
-                return await compileFn(compiled, documentOptions)
+                return await runCompile(format, compiled, documentOptions)
             } finally {
                 setIsCompiling(false)
             }

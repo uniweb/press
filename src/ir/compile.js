@@ -37,8 +37,15 @@ export function compileOutputs(store, format) {
 }
 
 /**
- * Compile HTML-based format outputs (docx, pdf).
+ * Compile HTML-based format outputs (docx, pdf, typst).
  * JSX fragments → renderToStaticMarkup → htmlToIR → grouped by role.
+ *
+ * Four roles:
+ *   - body (default): IR appended to `sections`.
+ *   - header / footer: IR held as the single document header or footer.
+ *   - metadata: fragment kept verbatim (no IR walk). Format adapters
+ *     consume this for document-level properties (title, author, isbn, …).
+ *     Fragments for the metadata role are plain data objects, not JSX.
  *
  * Registered fragments are React element trees captured during the live
  * page render. renderToStaticMarkup renders them afresh here, outside
@@ -51,6 +58,7 @@ export function compileOutputs(store, format) {
  * un-prefixed URLs that the docx adapter's fetch() then 404s on.
  */
 function compileHtmlBased(outputs, store) {
+    let metadata = null
     let header = null
     let footer = null
     const sections = []
@@ -58,10 +66,18 @@ function compileHtmlBased(outputs, store) {
     const wrap = store.wrapWithProviders || ((x) => x)
 
     for (const { fragment, options } of outputs) {
+        const role = options.role || 'body'
+
+        if (role === 'metadata') {
+            // Metadata fragments are plain data objects. No IR walk.
+            // Last registration wins — metadata is document-level, a single
+            // set of properties per document.
+            metadata = fragment
+            continue
+        }
+
         const html = renderToStaticMarkup(wrap(fragment))
         const ir = htmlToIR(html)
-
-        const role = options.role || 'body'
 
         switch (role) {
             case 'header':
@@ -77,7 +93,7 @@ function compileHtmlBased(outputs, store) {
         }
     }
 
-    return { sections, header, footer }
+    return { sections, header, footer, metadata }
 }
 
 /**

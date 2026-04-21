@@ -8,7 +8,11 @@
  * custom-adapter authors lives at '@uniweb/press/ir'.
  */
 
-export { default as DocumentProvider } from './DocumentProvider.jsx'
+export { default as DocumentProvider, createStore } from './DocumentProvider.jsx'
 export { useDocumentOutput } from './useDocumentOutput.js'
 export { useDocumentCompile } from './useDocumentCompile.js'
 export { triggerDownload } from './triggerDownload.js'
+export {
+    compileRegistrations,
+    compileSubtree,
+} from './compileRegistrations.js'

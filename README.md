@@ -120,6 +120,7 @@ API reference:
 
 Guides:
 
+- **[Publishing a book](./docs/guides/book-publishing.md)** — Whole-site aggregation, three compile modes (sources / server / wasm roadmap), the Vite dev plugin, and the two web modalities (same-JSX preview vs its-own-medium web UX).
 - **[The preview pattern](./docs/guides/preview-pattern.md)** — Render a compiled `.docx` back into a sandboxed iframe via `docx-preview` as a cross-check view, separate from the per-component React preview.
 - **[Multi-block reports](./docs/guides/multi-block-reports.md)** — How `DocumentProvider` aggregates output across many section components into one document.
 - **[Writing a custom adapter](./docs/guides/custom-adapter.md)** — Build a non-docx format adapter using `@uniweb/press/ir`.
@@ -136,10 +137,12 @@ There is also a runnable demo at [`examples/preview-iframe/`](./examples/preview
 
 | Entry point | What's in it |
 |---|---|
-| `@uniweb/press` | `DocumentProvider`, `useDocumentOutput`, `useDocumentCompile`, `triggerDownload` — the format-agnostic core |
+| `@uniweb/press` | `DocumentProvider`, `useDocumentOutput`, `useDocumentCompile`, `triggerDownload`, `createStore`, `compileRegistrations`, `compileSubtree` — the format-agnostic core |
 | `@uniweb/press/docx` | React builder components for docx output (`Paragraph`, `TextRun`, `H1`–`H4`, `Image`, `Link`, `List`, …) |
+| `@uniweb/press/typst` | React builder components for Typst output (`ChapterOpener`, `Heading`, `Paragraph`, `CodeBlock`, `List`, `Table`, `BlockQuote`, `Image`, `Asterism`, `Raw`, `Sequence`, …) |
 | `@uniweb/press/sections` | `Section` and `StandardSection` — register-and-render helpers that include their own `<section>` wrapper (for non-Uniweb React contexts) |
 | `@uniweb/press/ir` | IR utilities (`htmlToIR`, `attributeMap`, `compileOutputs`) for custom-adapter authors |
+| `@uniweb/press/vite-plugin-typst` | Dev-server Vite plugin that answers the Typst `server` compile mode by running `typst compile` locally and streaming back a PDF |
 
 The ~3.4 MB `docx` library is never pulled into the main bundle. It's loaded dynamically the first time `compile('docx')` runs.
 
@@ -150,6 +153,7 @@ Press separates the **framework** (registration, compile, download) from the **t
 | Toolkit | Status | Notes |
 |---|---|---|
 | **docx** | ✅ Shipped | Paragraphs, headings, text runs, tables, borders/margins/widths, bullet/numbered lists, hyperlinks, images with async fetch, page numbering, default headers/footers, `firstPageOnly` semantics. Uses the [`docx`](https://docx.js.org) library. |
+| **typst** | ✅ Shipped | Whole-book compile via `compileSubtree`, two compile modes (`sources` ZIP + `server` PDF via included Vite dev plugin), 12 builders + `Sequence` walker. Produces real PDFs through the [Typst](https://typst.app) compiler. See [Publishing a book](./docs/guides/book-publishing.md). |
 | **xlsx** | 🔜 Roadmap | Plain `{ title, headers, data }` objects, multi-sheet. Different shape from docx because spreadsheets aren't typography. |
 | **pdf** | 🔜 Roadmap | Either docx JSX via Paged.js or `@react-pdf/renderer` for fine control. Decision deferred. |
 
