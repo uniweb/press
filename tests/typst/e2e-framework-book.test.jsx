@@ -1,7 +1,7 @@
 /**
  * End-to-end Phase-1 validation.
  *
- * 1. Read a chapter from writing/books/framework/ on disk.
+ * 1. Read a chapter from projects/content/books/framework/ on disk.
  * 2. Run it through @uniweb/content-reader + @uniweb/semantic-parser to
  *    produce the exact content shape a Uniweb foundation would receive.
  * 3. Render the Press/typst Sequence walker over content.sequence.
@@ -46,7 +46,7 @@ const HAS_TYPST = typstAvailable()
 // Chapter 1 — prose-only, no code blocks. Small and representative.
 const CHAPTER_PATH = resolve(
     __dirname,
-    '../../../../writing/books/framework/pages/chapter-01-what-this-framework-is-for.md',
+    '../../../../projects/content/books/framework/chapter-01-what-this-framework-is-for.md',
 )
 
 describe.skipIf(!existsSync(CHAPTER_PATH))(
