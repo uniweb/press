@@ -177,6 +177,27 @@ describe('pagedjs adapter: compilePagedjs (html mode)', () => {
         )
     })
 
+    it('passes <math> subtrees through to the HTML body untouched', async () => {
+        const input = {
+            sections: [
+                '<p>Let <math xmlns="http://www.w3.org/1998/Math/MathML">' +
+                    '<mi>f</mi><mo>(</mo><mi>x</mi><mo>)</mo>' +
+                    '</math> be our function.</p>',
+                '<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">' +
+                    '<msup><mi>x</mi><mn>2</mn></msup>' +
+                    '</math>',
+            ],
+            metadata: { title: 'T' },
+        }
+        const blob = await compilePagedjs(input, { mode: 'html' })
+        const text = await blobToText(blob)
+        expect(text).toContain('<math')
+        expect(text).toContain('xmlns="http://www.w3.org/1998/Math/MathML"')
+        expect(text).toContain('<mi>f</mi>')
+        expect(text).toContain('<msup>')
+        expect(text).toContain('<mn>2</mn>')
+    })
+
     it('rejects unknown modes with a helpful message', async () => {
         await expect(
             compilePagedjs({ sections: [] }, { mode: 'bogus' }),

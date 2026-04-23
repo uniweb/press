@@ -464,6 +464,42 @@ describe('compileEpub — metadata', () => {
     })
 })
 
+describe('compileEpub — MathML pass-through', () => {
+    it('preserves <math> subtrees untouched in chapter XHTML', async () => {
+        const input = {
+            sections: [
+                '<p>Let <math xmlns="http://www.w3.org/1998/Math/MathML">' +
+                    '<mi>f</mi><mo>(</mo><mi>x</mi><mo>)</mo>' +
+                    '</math> be our function.</p>',
+            ],
+            metadata: { title: 'T', language: 'en' },
+        }
+        const blob = await compileEpub(input, { identifier: 'x' })
+        const zip = await blobToZip(blob)
+        const ch = await zip.file('OEBPS/chapters/ch-01.xhtml').async('string')
+        expect(ch).toContain('<math')
+        expect(ch).toContain('<mi>f</mi>')
+        expect(ch).toContain('xmlns="http://www.w3.org/1998/Math/MathML"')
+    })
+
+    it('preserves block display <math display="block"> with nested structure', async () => {
+        const input = {
+            sections: [
+                '<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">' +
+                    '<msup><mi>x</mi><mn>2</mn></msup>' +
+                    '</math>',
+            ],
+            metadata: { title: 'T', language: 'en' },
+        }
+        const blob = await compileEpub(input, { identifier: 'x' })
+        const zip = await blobToZip(blob)
+        const ch = await zip.file('OEBPS/chapters/ch-01.xhtml').async('string')
+        expect(ch).toContain('<msup>')
+        expect(ch).toContain('<mi>x</mi>')
+        expect(ch).toContain('<mn>2</mn>')
+    })
+})
+
 describe('serializeXhtml — direct unit tests', () => {
     it('serializes void tags self-closing', () => {
         const tree = parseFragment('<br><hr><img src="x.png">')
