@@ -1,63 +1,26 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Agent-specific guidance for working in this repository. For architectural positioning, user-facing concepts, and format-specific reference material, consult the docs listed under **Primary reading** below — CLAUDE.md does not duplicate them.
 
-## Project Overview
+## Primary reading
 
-`@uniweb/press` is a frontend document generation library for Uniweb foundations. Section components emit ordinary JSX using builder components (`<Paragraph>`, `<H1>`, `<TextRun>`, etc.); the same JSX renders as the browser preview AND is walked to produce a downloadable file — entirely in the browser, no backend, no intermediate upload. docx is the initial target; xlsx and PDF are on the roadmap.
+Read the relevant doc for the task before touching code. Do not rely on memory; these docs are the source of truth and supersede any cached understanding from a previous session.
 
-## Status
+- **`docs/architecture/principles.md`** — the constitution. Durable commitments about what Press is and is not. Consult before any non-trivial design decision or change that touches the public surface. A change that violates a principle either needs a different approach or an explicit amendment.
+- **`docs/architecture/overview.md`** — the map. How Press is actually put together: registration store, per-format fragment shapes, compile dispatch, adapter boundary. Consult when orienting to an unfamiliar area.
+- **`docs/architecture/adding-a-format.md`** — worked examples and checklist for writing a new adapter. Replaces the old ad-hoc procedural notes that used to live here.
+- **`docs/architecture/deployment.md`** — wire protocol, reference implementations, font story for formats that need a backend. Rarely needed unless working on server-mode code.
+- **`docs/architecture/format-roadmap.md`** — what's shipped, what's next. Check before proposing format work to make sure the plan isn't already resolved.
+- **`docs/concepts.md`** — user-facing mental model. Useful when writing guides or examples.
+- **`README.md`** — public pitch, hello-world, pointers. Useful for checking how Press is currently presented externally.
 
-The registration architecture, builder components, IR layer, section templates, and the docx, xlsx, and typst adapters are all in place, with 133+ tests across the suite. The public surface is expected to hold through 1.0. A new format adapter is a new file under `src/adapters/` plus an entry in the `ADAPTERS` map inside `src/useDocumentCompile.js` — and, when the format needs React primitives, a new `src/<format>/` barrel and a `./<format>` subpath in `package.json`'s `exports` field (mirroring how `/docx` and `/typst` are shaped).
+Cross-reference for legacy vocabulary: `kb/framework/reference/documents-legacy-references.md` carries the ~30 `data-*` attributes inherited verbatim from `@uniwebcms/report-sdk`. Do not redesign the vocabulary without good reason — foundation porting from the legacy SDK depends on exact names.
 
-**Press is published on npm** (currently `0.3.0`). The public surface is still pre-1.0 and external adoption is minimal, so breaking changes are acceptable when justified — but treat each release as a published artifact: bump versions through the workspace publish script, and keep the `exports` field and documented subpaths coherent.
-
-Architectural anchor is a pair of docs with different jobs — consult whichever fits your task:
-
-- **`docs/architecture/principles.md`** — the constitution. Durable commitments about what Press is and is not (registration as the only mandatory contract, adapters dynamic-imported, no forced universal IR, semantic input stays upstream, etc.). Consult before making non-trivial design decisions or changes that touch the public surface. A change that violates a principle either needs a different approach or an explicit amendment to the principles file.
-- **`docs/architecture/overview.md`** — the map. Contributor-oriented description of how Press is actually put together: the registration store, the per-format fragment shapes, the compile dispatch, the adapter boundary. Consult when approaching an unfamiliar area or orienting to the codebase as a whole.
-
-A new contributor lands on overview.md first (orientation); a contributor about to make a design change consults principles.md (constraints); a contributor writing a new adapter reads both (patterns + rules). Active format roadmaps and implementation plans live alongside them under `docs/design/`.
-
-The data-attribute vocabulary is inherited verbatim from the legacy `@uniwebcms/report-sdk` — ~30 attributes covering layout, borders, headings, numbering, positional tabs, image transforms, hyperlinks, and floating positioning. The legacy pointers live in `kb/framework/reference/documents-legacy-references.md`. Do not redesign the vocabulary without good reason — foundation porting from the legacy SDK depends on exact names.
-
-## No Build Step
+## No build step
 
 Like `@uniweb/kit`, this package ships **raw source files** — no bundler, no `dist/`. The `exports` field in `package.json` points directly at `./src/...`. Consumers (foundations) bundle via Vite themselves. Edits to `src/` are immediately effective in any linked workspace package; no build before tests or publish.
 
-## Public Subpaths
-
-```
-@uniweb/press                FORMAT-AGNOSTIC CORE
-  ├─ DocumentProvider          context holding WeakMap<Block, Output>
-  ├─ useDocumentOutput         registration hook (called by section components)
-  ├─ useDocumentCompile        returns { compile, isCompiling }; compile(fmt) → Promise<Blob>
-  └─ triggerDownload           utility: Blob → browser file download
-
-@uniweb/press/docx           DOCX REACT PRIMITIVES (atoms)
-  ├─ Paragraph, Paragraphs
-  ├─ TextRun
-  ├─ H1, H2, H3, H4
-  ├─ Image, Images
-  ├─ Link, Links
-  └─ List, Lists
-
-@uniweb/press/sections       SECTION TEMPLATES (molecules)
-  ├─ Section                   generic register-and-render wrapper
-  └─ StandardSection           opinionated Uniweb content-shape renderer
-
-@uniweb/press/ir             CUSTOM ADAPTER AUTHORING
-  ├─ htmlToIR
-  ├─ attributesToProperties
-  ├─ attributeMap
-  └─ compileOutputs
-```
-
-The **docx format adapter** (`compileDocx`, `buildDocument`, and the ~3.4 MB `docx` library) lives at `src/adapters/docx.js` — **not** in `package.json`'s `exports` field. It is reached only via the dynamic import inside `useDocumentCompile`, which keeps the large library out of the main bundle. A foundation that imports from `@uniweb/press/docx` for its React builders does not pull the library until `compile('docx')` actually runs.
-
-**Import rule of thumb:** foundation code imports from `@uniweb/press`, `@uniweb/press/docx`, and (optionally) `@uniweb/press/sections`. Custom-adapter authors additionally import from `@uniweb/press/ir`. Nothing in user-facing code should import directly from `src/adapters/` — if you find that pattern, the lazy-loading story is broken.
-
-## Source Layout
+## Source layout
 
 ```
 src/
@@ -67,7 +30,7 @@ src/
 ├── DocumentProvider.jsx
 ├── DocumentContext.js
 ├── useDocumentOutput.js
-├── useDocumentCompile.js        ← hook; dynamic-imports ./adapters/docx.js
+├── useDocumentCompile.js        ← hook; dynamic-imports ./adapters/*.js
 ├── triggerDownload.js           ← DOM utility
 │
 ├── docx/                        ← PUBLIC /docx — React builder components
@@ -80,13 +43,17 @@ src/
 │   ├── List.jsx
 │   └── parseStyledString.js     ← INTERNAL helper (not in barrel)
 │
+├── typst/                       ← PUBLIC /typst — React builder components
+│
 ├── sections/                    ← PUBLIC /sections — higher-level templates
 │   ├── index.js
 │   ├── Section.jsx
 │   └── StandardSection.jsx
 │
 ├── adapters/                    ← INTERNAL — not in package.json exports
-│   └── docx.js                  ← compileDocx, buildDocument, docx library
+│   ├── docx.js                  ← compileDocx, buildDocument, docx library
+│   ├── typst.js
+│   └── xlsx.js
 │
 └── ir/                          ← PUBLIC /ir — IR layer for custom adapters
     ├── index.js
@@ -100,6 +67,7 @@ tests/
 ├── core/                        ← provider, useDocumentOutput,
 │                                    useDocumentCompile, triggerDownload
 ├── docx/                        ← builders, adapter, parseStyledString
+├── typst/
 ├── sections/                    ← Section, StandardSection
 ├── ir/                          ← parser, attributes
 └── integration/                 ← orchestrator, full-pipeline,
@@ -107,24 +75,9 @@ tests/
                                      section-helpers
 ```
 
-```
-examples/
-└── preview-iframe/              ← runnable Vite demo of compile + preview
-                                    + download, declared as a workspace
-                                    package (workspace:* on @uniweb/press)
-```
+The public subpath listing with what each entry point exports lives in `README.md` — do not duplicate it here.
 
-## Architecture
-
-Three output patterns coexist by design:
-
-1. **docx:** JSX with semantic `data-type='table'`, `data-margins-*`, etc. Same JSX is the React preview AND the source for `compileDocx`. Zero divergence between preview and file.
-2. **xlsx (planned):** Plain `{ title, headers, data }` objects. Preview (often charts) is independent.
-3. **pdf (planned):** Either reuse docx JSX via Paged.js, or `@react-pdf/renderer` for fine control.
-
-What unifies them is the **registration interface** (`useDocumentOutput`), NOT the data shape. Don't try to force a single IR across all formats.
-
-The compile pipeline lives in `src/ir/compile.js`. `useDocumentCompile` pulls the store out of context, calls `compileOutputs(store, format)` to produce the adapter input, then dynamic-imports the adapter and hands it that input. This is the only place in Press that reaches into `src/adapters/`.
+**Import rule of thumb.** Foundation code imports from `@uniweb/press`, the builder subpaths (`/docx`, `/typst`), optionally `/sections`. Custom-adapter authors additionally import from `@uniweb/press/ir`. Nothing in user-facing code should import directly from `src/adapters/` — if you find that pattern, the lazy-loading story is broken.
 
 ## Conventions
 
@@ -134,15 +87,15 @@ The legacy SDK mutated `block.output[format]` from inside React render. We do no
 
 ### Compile is a separate primitive from download
 
-`useDocumentCompile` returns a Blob; it does NOT trigger a download. `triggerDownload` is a separate DOM utility. The split exists so consumers can preview a compiled Blob (e.g., render it into an iframe via `docx-preview`) without saving a file. `examples/preview-iframe/src/App.jsx` demonstrates both flows.
+`useDocumentCompile` returns a Blob; it does **not** trigger a download. `triggerDownload` is a separate DOM utility. The split exists so consumers can preview a compiled Blob (e.g., render it into an iframe via `docx-preview`) without saving a file. `examples/preview-iframe/src/App.jsx` demonstrates both flows.
 
 ### Section helpers are sugar, not required
 
-Foundations can use `useDocumentOutput` + `/docx` builders directly and skip `/sections` entirely. `Section` is a register-and-render convenience; `StandardSection` is an opinionated content-shape renderer with a `renderChildBlocks` escape hatch. `StandardSection` duck-types on the content shape (`content.title`, `content.paragraphs`, etc.) and does not import from `@uniweb/core`, so non-Uniweb projects that produce the same shape get it for free.
+Foundations can use `useDocumentOutput` + builders directly and skip `/sections` entirely. `Section` is a register-and-render convenience; `StandardSection` is an opinionated content-shape renderer with a `renderChildBlocks` escape hatch. `StandardSection` duck-types on the content shape (`content.title`, `content.paragraphs`, etc.) and does not import from `@uniweb/core`, so non-Uniweb projects that produce the same shape get it for free.
 
 ### No types
 
-Plain JavaScript with JSDoc comments for documentation only — no `@type` annotations, no type checker. Matches the rest of the Uniweb workspace. Don't introduce project-wide TypeScript.
+Plain JavaScript with JSDoc comments for documentation only — no `@type` annotations, no type checker. Matches the rest of the Uniweb workspace. Do not introduce project-wide TypeScript.
 
 ### parse5, not browser DOMParser
 
@@ -150,9 +103,9 @@ The IR parser uses `parse5` so it runs in Node and is unit-testable without jsdo
 
 ## Gotchas
 
-### Image emission — three invariants for a Word-clean .docx
+### docx image emission — three invariants for a Word-clean .docx
 
-Every ImageRun must satisfy all three of the following, or Word complains. The docx library does not enforce them for us, and each failure mode looks like a generic "corrupted docx" — they're easy to confuse. The big header comment above `irToImageParagraph` in `src/adapters/docx.js` enumerates them; the regression guard is in `tests/docx/monograph-docx.test.jsx`.
+Every `ImageRun` must satisfy all three of the following, or Word complains. The docx library does not enforce them for us, and each failure mode looks like a generic "corrupted docx" — they're easy to confuse. The header comment above `irToImageParagraph` in `src/adapters/docx.js` enumerates them; the regression guard is in `tests/docx/monograph-docx.test.jsx`.
 
 | # | Invariant | Failure mode |
 |---|---|---|
@@ -160,7 +113,7 @@ Every ImageRun must satisfy all three of the following, or Word complains. The d
 | 2 | `<wp:docPr name="..."/>` attribute always emitted (even as `""`) | Word-for-Mac refuses the file outright (no repair offered); Windows tolerates |
 | 3 | `type` passed to `ImageRun` so media writes as `<hash>.png` / `.jpg` / etc., not `<hash>.undefined` | Word opens with "found unreadable content"; repair adds an `application/octet-stream` default for the `.undefined` extension |
 
-Invariant #2 is a footgun specific to docx@9.x: `DocProperties({ id })` emits `<wp:docPr id="1"/>` with no `name` attribute because the constructor's default `name: ''` only fires when the argument is fully undefined. Any partial altText object skips that default. Our adapter always spreads `{ name: '' }` into altText before caller fields — that line looks like a no-op, do not remove.
+Invariant #2 is a footgun specific to `docx@9.x`: `DocProperties({ id })` emits `<wp:docPr id="1"/>` with no `name` attribute because the constructor's default `name: ''` only fires when the argument is fully undefined. Any partial altText object skips that default. Our adapter always spreads `{ name: '' }` into altText before caller fields — that line looks like a no-op; do not remove it.
 
 Diagnosing future Word-repair complaints: unzip the generated file, have the user open-and-save it in Word, unzip the repaired copy, and `diff -r` the two trees. Whatever Word added (content-type defaults, missing attributes, renamed parts) is what our emitter got wrong.
 
@@ -168,6 +121,8 @@ Diagnosing future Word-repair complaints: unzip the generated file, have the use
 
 - `parse5` — HTML parser (testable in Node)
 - `docx` — Word document generation (dynamically imported via `src/adapters/docx.js`, not in the main bundle)
+- `exceljs` — spreadsheet generation (dynamically imported)
+- `jszip` — source-bundle packaging for typst `sources` mode
 - React 18/19 as peer dependency
 
 ## Testing
@@ -182,19 +137,23 @@ pnpm test -t 'inline marks'                  # by test name
 
 Tests use `@testing-library/react` with the `jsdom` Vitest environment. The compile-to-Blob tests read the PK magic bytes via `FileReader.readAsArrayBuffer` because jsdom's `Blob` doesn't implement `arrayBuffer()` and wrapping in `Response` gives a UTF-8 decoded view that mangles binary bytes.
 
+## Runbooks
+
 ### Adding a builder component
 
-1. Create `src/docx/MyWidget.jsx` — pure JSX, `data-type="..."` attribute(s) for the IR walker to recognize, pass-through of extra `data-*` props via `...rest`.
-2. Add the export to `src/docx/index.js`.
+1. Create `src/<format>/MyWidget.jsx` — pure JSX, `data-type="..."` attribute(s) for the IR walker to recognize, pass-through of extra `data-*` props via `...rest`.
+2. Add the export to `src/<format>/index.js`.
 3. If the component introduces new data-attribute keys, extend `src/ir/attributes.js`'s `attributeMap` so the IR layer picks them up.
-4. Add component tests in `tests/docx/components.test.jsx` (render to static HTML, parse to IR, assert the IR shape) and an end-to-end case in `tests/integration/enriched-components.test.jsx`.
+4. Add component tests in `tests/<format>/components.test.jsx` (render to static HTML, parse to IR, assert the IR shape) and an end-to-end case in `tests/integration/enriched-components.test.jsx`.
 
 ### Adding a format adapter
 
-1. Create `src/adapters/my-format.js` exporting `compileMyFormat(compiledInput, options) → Promise<Blob>`.
-2. Add a loader to the `ADAPTERS` map in `src/useDocumentCompile.js`: `myFormat: () => import('./adapters/my-format.js')`.
-3. Add compile-pipeline handling in `src/ir/compile.js` if the format needs a different input shape than `compileHtmlBased()` produces (the xlsx branch is the reference).
-4. Do **not** add the adapter to `package.json`'s `exports` — it must remain internal so the library dependency stays dynamic-only. If the format needs React primitives, put those at `src/<format>/` and add a `./<format>` subpath in the `exports` field, mirroring the docx layout.
+See `docs/architecture/adding-a-format.md` for the checklist, worked examples (LaTeX, Paged.js), and the three canonical adapter shapes. The short version:
+
+1. Create `src/adapters/<format>.js` exporting `compile<Format>(compiledInput, options) → Promise<Blob>`.
+2. Add a loader to the `ADAPTERS` map in `src/useDocumentCompile.js`: `<format>: () => import('./adapters/<format>.js')`.
+3. Do **not** add the adapter to `package.json`'s `exports` — it must remain internal so the library dependency stays dynamic-only.
+4. If the format needs React primitives, put those at `src/<format>/` and add a `./<format>` subpath in the `exports` field, mirroring the docx layout.
 
 ### Adding a section helper
 
@@ -204,13 +163,6 @@ Tests use `@testing-library/react` with the `jsdom` Vitest environment. The comp
 
 ## Publishing
 
-Publishing is centralized at the workspace root via `pnpm framework:publish:*` (see root `CLAUDE.md`). The script auto-detects what needs publishing and cascades dependents. Do not run a per-package publish command from here. Press is live on npm (`@uniweb/press`, currently `0.3.0`); subsequent releases go through the same centralized pipeline.
+Publishing is centralized at the workspace root via `pnpm framework:publish:*` (see root `CLAUDE.md`). The script auto-detects what needs publishing and cascades dependents. Do not run a per-package publish command from here. Press is live on npm (`@uniweb/press`); subsequent releases go through the same centralized pipeline.
 
-## Cross-references
-
-- **`docs/architecture/principles.md` — the architectural constitution. Read first before making non-trivial design decisions.** Any change that touches the public surface, introduces a new format adapter, or reshapes the IR layer should be consistent with the principles there (or explicitly propose amending them).
-- `docs/architecture/overview.md` — contributor-oriented walk through how Press is put together
-- `kb/framework/reference/documents-legacy-references.md` — legacy `@uniwebcms/report-sdk` pointers (source of the data-attribute vocabulary)
-- `framework/kit/CLAUDE.md` — convention reference (this package mirrors kit's no-build-step pattern)
-- `examples/preview-iframe/` — runnable demo of the compile + preview + download flow
-- `tests/integration/preview-flow.test.jsx` — automated anchor for the demo's structural contract
+The public surface is still pre-1.0, so breaking changes are acceptable when justified — but each release is a published artifact. Bump versions through the workspace publish script, and keep the `exports` field and documented subpaths coherent.
