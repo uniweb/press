@@ -292,6 +292,110 @@ describe('compileEpub — image embedding', () => {
     })
 })
 
+describe('compileEpub — cover image + Kindle hints', () => {
+    let origFetch
+    beforeEach(() => {
+        origFetch = globalThis.fetch
+        globalThis.fetch = async () => ({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers: { get: (k) => (k.toLowerCase() === 'content-type' ? 'image/png' : '') },
+            arrayBuffer: async () => PNG_BYTES.buffer.slice(PNG_BYTES.byteOffset, PNG_BYTES.byteOffset + PNG_BYTES.byteLength),
+        })
+    })
+    afterEach(() => {
+        globalThis.fetch = origFetch
+    })
+
+    it('adds a cover page, manifest cover-image properties, and Kindle <meta name="cover"> hint', async () => {
+        const blob = await compileEpub(
+            { sections: ['<h1>Ch</h1>'], metadata: { title: 'T', language: 'en' } },
+            { identifier: 'x', cover: 'https://example.com/cover.png' },
+        )
+        const zip = await blobToZip(blob)
+
+        const opf = await zip.file('OEBPS/content.opf').async('string')
+        // EPUB3 cover-image property on the manifest image item.
+        expect(opf).toMatch(/properties="cover-image"/)
+        // Legacy Kindle hint: <meta name="cover" content="<img-id>"/>.
+        expect(opf).toMatch(/<meta\s+name="cover"\s+content="img-/)
+        // Cover page is in the manifest + spine.
+        expect(opf).toMatch(/<item\s+id="cover-page"[^>]*href="chapters\/cover\.xhtml"/)
+        // Cover should be linear="no" so readers jump past it on open.
+        expect(opf).toMatch(/<itemref\s+idref="cover-page"\s+linear="no"/)
+        // The cover XHTML exists and references the image.
+        const cover = await zip.file('OEBPS/chapters/cover.xhtml').async('string')
+        expect(cover).toContain('epub:type="cover"')
+        expect(cover).toMatch(/<img\s+src="\.\.\/images\/[^"]+"/)
+    })
+
+    it('cover also reachable via the registered metadata.coverImage field', async () => {
+        const blob = await compileEpub(
+            {
+                sections: ['<h1>Ch</h1>'],
+                metadata: {
+                    title: 'T',
+                    language: 'en',
+                    coverImage: 'https://example.com/cover2.png',
+                },
+            },
+            { identifier: 'x' },
+        )
+        const zip = await blobToZip(blob)
+        const opf = await zip.file('OEBPS/content.opf').async('string')
+        expect(opf).toMatch(/properties="cover-image"/)
+    })
+
+    it('no cover emitted when none supplied — behaviour is backwards-compatible', async () => {
+        const blob = await compileEpub(
+            { sections: ['<h1>Ch</h1>'], metadata: { title: 'T', language: 'en' } },
+            { identifier: 'x' },
+        )
+        const zip = await blobToZip(blob)
+        const opf = await zip.file('OEBPS/content.opf').async('string')
+        expect(opf).not.toMatch(/properties="cover-image"/)
+        expect(opf).not.toMatch(/<meta\s+name="cover"/)
+        expect(zip.file('OEBPS/chapters/cover.xhtml')).toBeNull()
+    })
+})
+
+describe('compileEpub — landmarks nav', () => {
+    it('emits a landmarks nav with toc and bodymatter entries', async () => {
+        const blob = await compileEpub(
+            { sections: ['<h1>First</h1>'], metadata: { title: 'T', language: 'en' } },
+            { identifier: 'x' },
+        )
+        const zip = await blobToZip(blob)
+        const nav = await zip.file('OEBPS/nav.xhtml').async('string')
+        expect(nav).toMatch(/<nav\s+epub:type="landmarks"/)
+        expect(nav).toMatch(/epub:type="toc"\s+href="nav\.xhtml#toc"/)
+        expect(nav).toMatch(/epub:type="bodymatter"\s+href="chapters\/ch-01\.xhtml"/)
+    })
+
+    it('landmarks includes the cover when a cover was emitted', async () => {
+        const origFetch = globalThis.fetch
+        globalThis.fetch = async () => ({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers: { get: (k) => (k.toLowerCase() === 'content-type' ? 'image/png' : '') },
+            arrayBuffer: async () => PNG_BYTES.buffer.slice(PNG_BYTES.byteOffset, PNG_BYTES.byteOffset + PNG_BYTES.byteLength),
+        })
+        try {
+            const blob = await compileEpub(
+                { sections: ['<h1>First</h1>'], metadata: { title: 'T', language: 'en' } },
+                { identifier: 'x', cover: 'https://example.com/c.png' },
+            )
+            const zip = await blobToZip(blob)
+            const nav = await zip.file('OEBPS/nav.xhtml').async('string')
+            expect(nav).toMatch(/epub:type="cover"\s+href="chapters\/cover\.xhtml"/)
+        } finally {
+            globalThis.fetch = origFetch
+        }
+    })
+})
+
 describe('compileEpub — nav and NCX', () => {
     it('nav.xhtml has an epub:type="toc" nav element with one link per chapter', async () => {
         const input = {

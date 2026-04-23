@@ -51,28 +51,34 @@ import { fetchAssets } from '../assets/fetch.js'
  *   written to `OEBPS/styles.css`. When omitted, DEFAULT_STYLESHEET is used.
  * @param {string} [options.identifier] - EPUB `dc:identifier`. When omitted,
  *   a UUID is generated at compile time.
+ * @param {string} [options.cover] - URL of the cover image. When set, the
+ *   fetched bytes are embedded in OEBPS/images/, referenced in the manifest
+ *   with `properties="cover-image"` (EPUB3) and pointed at by a legacy
+ *   `<meta name="cover">` hint (Kindle KF8 compatibility).
  * @returns {Promise<Blob>}
  */
 export async function compileEpub(input, options = {}) {
     const { sections = [], metadata = null } = input || {}
-    const { meta = {}, stylesheet, identifier } = options
+    const { meta = {}, stylesheet, identifier, cover } = options
 
     const resolvedMeta = { ...(metadata || {}), ...meta }
     const css = stylesheet || DEFAULT_STYLESHEET
     const id = identifier || resolvedMeta.identifier || generateUuid()
+    const coverUrl = cover || resolvedMeta.cover || resolvedMeta.coverImage
 
     // Walk each HTML fragment, collect image URLs, capture a chapter title.
     // The parsed tree is kept so we can re-serialize as XHTML after
     // rewriting <img src> to manifest-relative paths.
     const chapters = sections.map((html, i) => buildChapter(html, i))
 
-    // Deduplicate image URLs across all chapters and fetch them in parallel.
-    // Failed fetches are logged and the original URL is left in place — the
-    // EPUB still opens, the reader may or may not be able to resolve it.
+    // Deduplicate image URLs across all chapters — and the cover, if any —
+    // and fetch them in parallel. Failed fetches are logged and the original
+    // URL is left in place; the EPUB still opens but may show broken images.
     const imageUrls = new Set()
     for (const ch of chapters) {
         for (const url of ch.images) imageUrls.add(url)
     }
+    if (coverUrl) imageUrls.add(coverUrl)
     const fetched = imageUrls.size
         ? await fetchAssets(imageUrls)
         : new Map()
@@ -82,6 +88,7 @@ export async function compileEpub(input, options = {}) {
     const imagesManifest = []
     const urlToPath = new Map()
     const seenPaths = new Set()
+    let coverImageId = null
     for (const [url, result] of fetched) {
         if (result.error) {
             console.warn(`@uniweb/press epub: failed to fetch image ${url}: ${result.error.message}`)
@@ -90,15 +97,18 @@ export async function compileEpub(input, options = {}) {
         const filename = `${result.hash}.${result.ext}`
         const path = `images/${filename}`
         urlToPath.set(url, path)
+        const imgId = `img-${result.hash}`
         if (!seenPaths.has(path)) {
             seenPaths.add(path)
             imagesManifest.push({
-                id: `img-${result.hash}`,
+                id: imgId,
                 path,
                 mime: result.mime || 'application/octet-stream',
                 bytes: result.bytes,
+                isCover: url === coverUrl,
             })
         }
+        if (url === coverUrl) coverImageId = imgId
     }
 
     // Second pass over chapters — rewrite <img src> to manifest paths and
@@ -120,34 +130,65 @@ export async function compileEpub(input, options = {}) {
         }
     })
 
+    // When a cover image was provided and fetched successfully, synthesize a
+    // cover-page XHTML (epub:type="cover") that precedes all content chapters
+    // in the spine. Some readers (iBooks, Kobo) show the manifest cover-image
+    // only on the shelf; an in-book cover page guarantees readers that don't
+    // render a shelf cover still see one when they open the book.
+    const coverImage = coverImageId
+        ? imagesManifest.find((img) => img.id === coverImageId)
+        : null
+    const coverChapter = coverImage
+        ? {
+              id: 'cover-page',
+              path: 'chapters/cover.xhtml',
+              title: resolvedMeta.coverTitle || 'Cover',
+              xhtml: buildCoverXhtml({
+                  language: resolvedMeta.language || 'en',
+                  title: resolvedMeta.title || 'Cover',
+                  imagePath: `../${coverImage.path}`,
+                  alt: resolvedMeta.coverAlt || resolvedMeta.title || 'Cover',
+              }),
+              isCover: true,
+          }
+        : null
+    const spineChapters = coverChapter
+        ? [coverChapter, ...chapterManifest]
+        : chapterManifest
+
     // Assemble the ZIP. mimetype must be first and STORED uncompressed —
-    // invariant #1. JSZip's defaults are DEFLATE; override via compression.
+    // invariant #1. Everything else is DEFLATEd for size; a 200–400KB book
+    // typically halves when XHTML/OPF/NCX are deflated. JSZip's default
+    // when generateAsync is called without per-file overrides is STORE, so
+    // pass compression at the generate level AND keep the per-file STORE
+    // on mimetype.
     const zip = new JSZip()
-    zip.file('mimetype', 'application/epub+zip', {
-        compression: 'STORE',
-    })
-    zip.file('META-INF/container.xml', buildContainerXml(), { compression: 'DEFLATE' })
+    zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' })
+    zip.file('META-INF/container.xml', buildContainerXml())
 
     const oebps = zip.folder('OEBPS')
     oebps.file('content.opf', buildOpf({
         id,
         meta: resolvedMeta,
-        chapters: chapterManifest,
+        chapters: spineChapters,
         images: imagesManifest,
+        coverImageId,
+        coverPageId: coverChapter ? coverChapter.id : null,
     }))
     oebps.file('nav.xhtml', buildNav({
         language: resolvedMeta.language || 'en',
         title: resolvedMeta.title || 'Contents',
         chapters: chapterManifest,
+        coverPage: coverChapter,
     }))
     oebps.file('toc.ncx', buildNcx({
         id,
         title: resolvedMeta.title || 'Book',
-        chapters: chapterManifest,
+        chapters: spineChapters,
     }))
     oebps.file('styles.css', css)
 
-    for (const ch of chapterManifest) {
+    for (const ch of spineChapters) {
         oebps.file(ch.path, ch.xhtml)
     }
     for (const img of imagesManifest) {
@@ -157,6 +198,8 @@ export async function compileEpub(input, options = {}) {
     const blob = await zip.generateAsync({
         type: 'blob',
         mimeType: 'application/epub+zip',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 },
     })
     return blob
 }
@@ -316,8 +359,14 @@ function buildContainerXml() {
 /**
  * EPUB3 package document. Declares metadata, manifest (every file under
  * OEBPS), and spine (ordered reading sequence).
+ *
+ * Cover handling is intentionally dual: EPUB3 readers pick up the cover
+ * from `properties="cover-image"` on the manifest item; Amazon's KF8
+ * converter (used by "Send to Kindle" and older kindlegen) still wants a
+ * legacy `<meta name="cover" content="<image-id>"/>` hint in metadata.
+ * Emitting both is cheap and covers the whole ecosystem.
  */
-export function buildOpf({ id, meta, chapters, images }) {
+export function buildOpf({ id, meta, chapters, images, coverImageId, coverPageId }) {
     const title = meta.title || 'Untitled'
     const language = meta.language || 'en'
     const author = meta.author
@@ -338,6 +387,12 @@ export function buildOpf({ id, meta, chapters, images }) {
     if (subject) metaLines.push(`    <dc:subject>${escapeXmlText(subject)}</dc:subject>`)
     if (rights) metaLines.push(`    <dc:rights>${escapeXmlText(rights)}</dc:rights>`)
     metaLines.push(`    <meta property="dcterms:modified">${escapeXmlText(modified)}</meta>`)
+    // Legacy Kindle/KF8 cover hint — Amazon's converter still reads this.
+    if (coverImageId) {
+        metaLines.push(
+            `    <meta name="cover" content="${escapeXmlAttr(coverImageId)}"/>`,
+        )
+    }
 
     const manifestLines = [
         `    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>`,
@@ -350,14 +405,21 @@ export function buildOpf({ id, meta, chapters, images }) {
         )
     }
     for (const img of images) {
+        // EPUB3 cover hint — readers use this to pick the shelf thumbnail.
+        const coverProp = img.id === coverImageId ? ' properties="cover-image"' : ''
         manifestLines.push(
-            `    <item id="${escapeXmlAttr(img.id)}" href="${escapeXmlAttr(img.path)}" media-type="${escapeXmlAttr(img.mime)}"/>`,
+            `    <item id="${escapeXmlAttr(img.id)}" href="${escapeXmlAttr(img.path)}" media-type="${escapeXmlAttr(img.mime)}"${coverProp}/>`,
         )
     }
 
-    const spineLines = chapters.map(
-        (ch) => `    <itemref idref="${escapeXmlAttr(ch.id)}"/>`,
-    )
+    const spineLines = chapters.map((ch) => {
+        // Cover page should not linger in the reading flow for left-to-right
+        // navigation — `linear="no"` lets readers jump straight to content.
+        const attrs = ch.id === coverPageId
+            ? ` idref="${escapeXmlAttr(ch.id)}" linear="no"`
+            : ` idref="${escapeXmlAttr(ch.id)}"`
+        return `    <itemref${attrs}/>`
+    })
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id" xml:lang="${escapeXmlAttr(language)}">
@@ -377,14 +439,39 @@ ${spineLines.join('\n')}
 /**
  * EPUB3 navigation document. Primary TOC — replaces the NCX for EPUB3
  * readers but NCX is still emitted for EPUB2 compatibility.
+ *
+ * Two nav elements are emitted:
+ *   - `epub:type="toc"`: the reading-order chapter list (required).
+ *   - `epub:type="landmarks"`: quick-jump entries for cover, TOC, and
+ *     bodymatter start (optional, but assistive-tech readers and many
+ *     e-readers use it to offer "Go to cover" / "Go to beginning").
  */
-export function buildNav({ language, title, chapters }) {
+export function buildNav({ language, title, chapters, coverPage }) {
     const items = chapters
         .map(
             (ch) =>
                 `        <li><a href="${escapeXmlAttr(ch.path)}">${escapeXmlText(ch.title)}</a></li>`,
         )
         .join('\n')
+
+    const landmarkLines = []
+    if (coverPage) {
+        landmarkLines.push(
+            `        <li><a epub:type="cover" href="${escapeXmlAttr(coverPage.path)}">Cover</a></li>`,
+        )
+    }
+    landmarkLines.push(`        <li><a epub:type="toc" href="nav.xhtml#toc">Table of Contents</a></li>`)
+    if (chapters.length) {
+        landmarkLines.push(
+            `        <li><a epub:type="bodymatter" href="${escapeXmlAttr(chapters[0].path)}">Start of Content</a></li>`,
+        )
+    }
+    const landmarks = `    <nav epub:type="landmarks" id="landmarks" hidden="hidden">
+      <h2>Landmarks</h2>
+      <ol>
+${landmarkLines.join('\n')}
+      </ol>
+    </nav>`
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
@@ -400,6 +487,7 @@ export function buildNav({ language, title, chapters }) {
 ${items}
       </ol>
     </nav>
+${landmarks}
   </body>
 </html>
 `
@@ -429,6 +517,31 @@ export function buildNcx({ id, title, chapters }) {
 ${navPoints}
   </navMap>
 </ncx>
+`
+}
+
+/**
+ * Build the cover-page XHTML. Uses `epub:type="cover"` so assistive tech
+ * and the landmarks nav can identify it. The image scales to the viewport
+ * via inline SVG-style CSS so it works on both phone-sized readers and
+ * tablet-sized ones without the foundation needing to override styles.
+ */
+export function buildCoverXhtml({ language, title, imagePath, alt }) {
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="${escapeXmlAttr(language)}">
+  <head>
+    <meta charset="utf-8"/>
+    <title>${escapeXmlText(title)}</title>
+    <style type="text/css">
+      body { margin: 0; padding: 0; text-align: center; }
+      img { max-width: 100%; max-height: 100vh; height: auto; }
+    </style>
+  </head>
+  <body epub:type="cover">
+    <div><img src="${escapeXmlAttr(imagePath)}" alt="${escapeXmlAttr(alt)}"/></div>
+  </body>
+</html>
 `
 }
 
