@@ -84,12 +84,20 @@ export async function compileDocx(input, options = {}) {
  *   - numbering: Array<NumberingConfig> — numbering definitions that
  *     paragraphs can reference via `data-numbering-reference="…"`.
  *     Passed through to `new Document({ numbering: { config } })`.
+ *   - pageMargin: Object — page margin overrides, merged into the
+ *     section's `properties.page.margin`. Shape matches the docx
+ *     library's `IPageMarginAttributes` — all keys are twips (1 inch =
+ *     1440): `top`, `right`, `bottom`, `left`, `header`, `footer`,
+ *     `gutter`, `mirror`. The `header` and `footer` margins define the
+ *     *carrier-paragraph* slot used by registered headers/footers; set
+ *     both to a non-zero value or floating anchors inside those slots
+ *     may be dropped. Omit to keep the docx library's defaults.
  *   - Any other key (title, subject, creator, description, keywords, …)
  *     is forwarded as-is to the Document constructor.
  *
- *   Callers that omit paragraphStyles/numbering pay nothing — the
- *   adapter still produces a valid document, it just has no named
- *   style or numbering definitions for paragraphs to reference.
+ *   Callers that omit paragraphStyles/numbering/pageMargin pay nothing —
+ *   the adapter still produces a valid document, it just has no named
+ *   style, numbering definition, or margin override.
  * @returns {Promise<Document>}
  */
 export async function buildDocument(input, options = {}) {
@@ -104,6 +112,7 @@ export async function buildDocument(input, options = {}) {
     const {
         paragraphStyles,
         numbering,
+        pageMargin,
         ...documentMetadata
     } = options
 
@@ -125,7 +134,10 @@ export async function buildDocument(input, options = {}) {
     const sectionOptions = {
         properties: {
             type: SectionType.CONTINUOUS,
-            page: { pageNumbers: { start: 1, formatType: NumberFormat.DECIMAL } },
+            page: {
+                pageNumbers: { start: 1, formatType: NumberFormat.DECIMAL },
+                ...(pageMargin ? { margin: pageMargin } : {}),
+            },
         },
         children,
     }
