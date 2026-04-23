@@ -29,7 +29,8 @@ import { getAdapterDescriptor } from '../adapters/dispatch.js'
  * @param {Object} store - The DocumentProvider store (from DocumentContext).
  * @param {string} format - Format identifier ('docx', 'xlsx', 'typst', 'pagedjs', …).
  * @returns {Object} Adapter input shape. Two shapes today:
- *   - IR-based (docx/typst):  { sections: IR[][], header, footer, metadata }
+ *   - IR-based (docx/typst):  { sections: IR[][], header, footer, metadata,
+ *                               headerFirstPageOnly, footerFirstPageOnly }
  *   - Passthrough (xlsx):     { sections: Object[] }
  *   - Passthrough (pagedjs):  { sections: string[], metadata }
  */
@@ -72,6 +73,12 @@ export function compileOutputs(store, format) {
  *     consume this for document-level properties (title, author, isbn, …).
  *     Fragments for the metadata role are plain data objects, not JSX.
  *
+ * Header and footer registrations accept an `applyTo` option. When set
+ * to `'first'`, the output carries `headerFirstPageOnly` /
+ * `footerFirstPageOnly` booleans so format adapters can emit a
+ * different-first-page section layout. Other `applyTo` values (`'all'`
+ * default, `'odd'`, `'even'`) produce no flag.
+ *
  * Registered fragments are React element trees captured during the live
  * page render. renderToStaticMarkup renders them afresh here, outside
  * the React tree the page rendered in — so any context the builders
@@ -86,6 +93,8 @@ function compileToIR(outputs, store) {
     let metadata = null
     let header = null
     let footer = null
+    let headerFirstPageOnly = false
+    let footerFirstPageOnly = false
     const sections = []
 
     const wrap = store.wrapWithProviders || ((x) => x)
@@ -107,9 +116,11 @@ function compileToIR(outputs, store) {
         switch (role) {
             case 'header':
                 header = ir
+                if (options.applyTo === 'first') headerFirstPageOnly = true
                 break
             case 'footer':
                 footer = ir
+                if (options.applyTo === 'first') footerFirstPageOnly = true
                 break
             default:
                 sections.push(ir)
@@ -117,7 +128,14 @@ function compileToIR(outputs, store) {
         }
     }
 
-    return { sections, header, footer, metadata }
+    return {
+        sections,
+        header,
+        footer,
+        metadata,
+        headerFirstPageOnly,
+        footerFirstPageOnly,
+    }
 }
 
 /**

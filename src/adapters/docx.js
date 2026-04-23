@@ -162,6 +162,20 @@ export async function buildDocument(input, options = {}) {
         sectionOptions.footers = { default: createDefaultHeaderFooter(false) }
     }
 
+    // When either side opts in to `applyTo: 'first'`, the section gets
+    // `titlePage = true`, which tells Word to look up `first` variants on
+    // page 1. If the opposite side only registered a `default`, Word leaves
+    // page 1's header or footer blank — the default isn't consulted. Mirror
+    // `default` into `first` so all-pages content still renders on page 1.
+    if (sectionOptions.properties.titlePage) {
+        if (sectionOptions.headers && !sectionOptions.headers.first) {
+            sectionOptions.headers.first = sectionOptions.headers.default
+        }
+        if (sectionOptions.footers && !sectionOptions.footers.first) {
+            sectionOptions.footers.first = sectionOptions.footers.default
+        }
+    }
+
     const docOptions = {
         ...documentMetadata,
         sections: [sectionOptions],

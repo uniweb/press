@@ -70,3 +70,42 @@ describe('compileOutputs: role grouping (HTML-based formats)', () => {
         expect(compiled.metadata).toBeNull()
     })
 })
+
+describe('compileOutputs: applyTo:first plumbing', () => {
+    it('emits headerFirstPageOnly:true when the header was registered with applyTo:first', () => {
+        const store = makeStore([
+            {
+                fragment: <p data-type="paragraph">cover header</p>,
+                options: { role: 'header', applyTo: 'first' },
+            },
+        ])
+        const compiled = compileOutputs(store, 'docx')
+        expect(compiled.headerFirstPageOnly).toBe(true)
+        expect(compiled.footerFirstPageOnly).toBe(false)
+    })
+
+    it('emits footerFirstPageOnly:true when the footer was registered with applyTo:first', () => {
+        const store = makeStore([
+            {
+                fragment: <p data-type="paragraph">cover footer</p>,
+                options: { role: 'footer', applyTo: 'first' },
+            },
+        ])
+        const compiled = compileOutputs(store, 'docx')
+        expect(compiled.headerFirstPageOnly).toBe(false)
+        expect(compiled.footerFirstPageOnly).toBe(true)
+    })
+
+    it('defaults both flags to false when applyTo is absent or not "first"', () => {
+        const store = makeStore([
+            { fragment: <p data-type="paragraph">h</p>, options: { role: 'header' } },
+            {
+                fragment: <p data-type="paragraph">f</p>,
+                options: { role: 'footer', applyTo: 'all' },
+            },
+        ])
+        const compiled = compileOutputs(store, 'docx')
+        expect(compiled.headerFirstPageOnly).toBe(false)
+        expect(compiled.footerFirstPageOnly).toBe(false)
+    })
+})

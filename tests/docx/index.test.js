@@ -249,6 +249,76 @@ describe('default headers/footers', () => {
         expect(buffer[0]).toBe(0x50)
         expect(buffer.length).toBeGreaterThan(4000)
     })
+
+    // Regression guard for the `titlePage` symmetry bug: when only the
+    // header opts into `applyTo: 'first'`, the section sets `titlePg`,
+    // which tells Word to look up `first` variants on page 1. Without a
+    // `footers.first` entry, page 1's footer comes out blank — the
+    // `default` entry is NOT consulted for the first page. The adapter
+    // mirrors `default` → `first` on the opposite side when `titlePage`
+    // is enabled so the all-pages content still renders on page 1.
+    it('emits first-page footer references when only the header is firstPageOnly', async () => {
+        const headerIR = [
+            { type: 'paragraph', children: [{ type: 'text', content: 'Cover Header' }] },
+        ]
+        const footerIR = [
+            { type: 'paragraph', children: [{ type: 'text', content: 'All Pages Footer' }] },
+        ]
+        const bodyIR = htmlToIR('<p data-type="paragraph">Body</p>')
+        const doc = await buildDocument({
+            sections: [bodyIR],
+            header: headerIR,
+            footer: footerIR,
+            headerFirstPageOnly: true,
+        })
+        const xml = await readDocumentXml(doc)
+        expect(xml).toContain('<w:titlePg/>')
+        expect(xml).toMatch(/<w:footerReference[^>]*w:type="first"/)
+        expect(xml).toMatch(/<w:footerReference[^>]*w:type="default"/)
+        expect(xml).toMatch(/<w:headerReference[^>]*w:type="first"/)
+        expect(xml).toMatch(/<w:headerReference[^>]*w:type="default"/)
+    })
+
+    it('emits first-page header references when only the footer is firstPageOnly', async () => {
+        const headerIR = [
+            { type: 'paragraph', children: [{ type: 'text', content: 'All Pages Header' }] },
+        ]
+        const footerIR = [
+            { type: 'paragraph', children: [{ type: 'text', content: 'Cover Footer' }] },
+        ]
+        const bodyIR = htmlToIR('<p data-type="paragraph">Body</p>')
+        const doc = await buildDocument({
+            sections: [bodyIR],
+            header: headerIR,
+            footer: footerIR,
+            footerFirstPageOnly: true,
+        })
+        const xml = await readDocumentXml(doc)
+        expect(xml).toContain('<w:titlePg/>')
+        expect(xml).toMatch(/<w:headerReference[^>]*w:type="first"/)
+        expect(xml).toMatch(/<w:headerReference[^>]*w:type="default"/)
+        expect(xml).toMatch(/<w:footerReference[^>]*w:type="first"/)
+        expect(xml).toMatch(/<w:footerReference[^>]*w:type="default"/)
+    })
+
+    it('does not emit titlePg when neither side is firstPageOnly', async () => {
+        const headerIR = [
+            { type: 'paragraph', children: [{ type: 'text', content: 'H' }] },
+        ]
+        const footerIR = [
+            { type: 'paragraph', children: [{ type: 'text', content: 'F' }] },
+        ]
+        const bodyIR = htmlToIR('<p data-type="paragraph">Body</p>')
+        const doc = await buildDocument({
+            sections: [bodyIR],
+            header: headerIR,
+            footer: footerIR,
+        })
+        const xml = await readDocumentXml(doc)
+        expect(xml).not.toContain('<w:titlePg/>')
+        expect(xml).not.toMatch(/<w:footerReference[^>]*w:type="first"/)
+        expect(xml).not.toMatch(/<w:headerReference[^>]*w:type="first"/)
+    })
 })
 
 // ============================================================================
