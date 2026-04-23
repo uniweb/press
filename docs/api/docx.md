@@ -256,6 +256,30 @@ useDocumentOutput(block, 'docx', (
 ), { role: 'footer' })
 ```
 
+## Compile options
+
+`compile('docx', options)` forwards most keys straight to the docx library's `Document` constructor — `title`, `subject`, `creator`, `description`, `keywords`, etc. A handful are consumed by the adapter itself:
+
+- **`paragraphStyles`** — `Array<ParagraphStyle>` — named styles paragraphs can reference via `data-style="…"`. Wrapped into `new Document({ styles: { paragraphStyles } })`. See the [style-pack guide](../guides/style-pack.md) for recipes.
+- **`numbering`** — `Array<NumberingConfig>` — numbering definitions paragraphs can reference via `data-numbering-reference="…"`. Wrapped into `new Document({ numbering: { config } })`.
+- **`pageMargin`** — `Object` — page margin overrides merged into the section's `properties.page.margin`. Shape matches the docx library's `IPageMarginAttributes`. All keys are twips (1 inch = 1440): `top`, `right`, `bottom`, `left`, `header`, `footer`, `gutter`, `mirror`. Omit to keep the library's defaults.
+
+The `header` and `footer` keys inside `pageMargin` define the **carrier-paragraph slot** used by registered headers/footers. Both must be non-zero (Word's default is 720 twips / 0.5 inch) or a floating image anchored inside that slot may be dropped when Word lays out the page.
+
+```js
+await compile('docx', {
+    title: 'Annual Report',
+    pageMargin: {
+        top: 1800,    // 1.25" — clears a 1.17" banner image on page 1
+        bottom: 1584, // 1.10" — clears a 0.57" footer strip
+        left: 1440,   // 1.00"
+        right: 1440,  // 1.00"
+        header: 720,  // 0.50" carrier-paragraph slot
+        footer: 720,  // 0.50" carrier-paragraph slot
+    },
+})
+```
+
 ## See also
 
 - **[/sections reference](./sections.md)** — `Section` and `StandardSection` remove the register-and-render boilerplate around these builders.

@@ -781,3 +781,56 @@ describe('footnotes', () => {
         expect(documentXml).not.toContain('<w:footnoteReference')
     })
 })
+
+// ============================================================================
+// pageMargin option — overrides the section's page margin attributes.
+// Values are in twips (1 inch = 1440). The `header` and `footer` entries
+// define the carrier-paragraph slot used by registered headers/footers;
+// both must be non-zero for floating anchors inside those slots to survive.
+// ============================================================================
+
+describe('buildDocument pageMargin option', () => {
+    it('propagates pageMargin values into <w:pgMar> on the section', async () => {
+        const ir = htmlToIR('<p data-type="paragraph">Body</p>')
+        const doc = await buildDocument(
+            { sections: [ir] },
+            {
+                pageMargin: {
+                    top: 1800,
+                    right: 1440,
+                    bottom: 1584,
+                    left: 1440,
+                    header: 720,
+                    footer: 720,
+                },
+            },
+        )
+        const xml = await readDocumentXml(doc)
+        expect(xml).toMatch(/<w:pgMar[^>]*\bw:top="1800"/)
+        expect(xml).toMatch(/<w:pgMar[^>]*\bw:right="1440"/)
+        expect(xml).toMatch(/<w:pgMar[^>]*\bw:bottom="1584"/)
+        expect(xml).toMatch(/<w:pgMar[^>]*\bw:left="1440"/)
+        expect(xml).toMatch(/<w:pgMar[^>]*\bw:header="720"/)
+        expect(xml).toMatch(/<w:pgMar[^>]*\bw:footer="720"/)
+    })
+
+    it('accepts a partial pageMargin object', async () => {
+        const ir = htmlToIR('<p data-type="paragraph">Body</p>')
+        const doc = await buildDocument(
+            { sections: [ir] },
+            { pageMargin: { top: 2880, bottom: 2880 } },
+        )
+        const xml = await readDocumentXml(doc)
+        expect(xml).toMatch(/<w:pgMar[^>]*\bw:top="2880"/)
+        expect(xml).toMatch(/<w:pgMar[^>]*\bw:bottom="2880"/)
+    })
+
+    it('does not emit non-default margins when pageMargin is omitted', async () => {
+        const ir = htmlToIR('<p data-type="paragraph">Body</p>')
+        const doc = await buildDocument({ sections: [ir] })
+        const xml = await readDocumentXml(doc)
+        // The docx library emits a <w:pgMar> with its own defaults
+        // regardless; assert we did not inject a distinctive value.
+        expect(xml).not.toContain('w:top="1800"')
+    })
+})
