@@ -53,8 +53,6 @@
     },
     "devDependencies": {
         "@testing-library/react": "^16.0.0",
-        "@uniweb/content-reader": "workspace:*",
-        "@uniweb/semantic-parser": "workspace:*",
         "jsdom": "^25.0.0",
         "vitest": "^2.0.0"
     }
