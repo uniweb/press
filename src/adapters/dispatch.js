@@ -40,9 +40,10 @@ const ADAPTERS = {
     docx: { load: () => import('./docx.js'), consumes: 'docx', ir: true },
     xlsx: { load: () => import('./xlsx.js'), consumes: 'xlsx', ir: false },
     typst: { load: () => import('./typst.js'), consumes: 'typst', ir: true },
-    // Paged.js consumes 'html' — an input shape also targeted by future
-    // HTML-string adapters (EPUB). Foundations register once under 'html'.
+    // Paged.js consumes 'html' — an input shape shared with EPUB below.
+    // Foundations register once under 'html' and both adapters read it.
     pagedjs: { load: () => import('./pagedjs.js'), consumes: 'html', ir: false },
+    epub: { load: () => import('./epub.js'), consumes: 'html', ir: false },
 }
 
 /**
@@ -79,6 +80,7 @@ export async function runCompile(format, compiledInput, documentOptions = {}) {
         adapter.compileXlsx ||
         adapter.compileTypst ||
         adapter.compilePagedjs ||
+        adapter.compileEpub ||
         adapter.compilePdf
     if (!compileFn) {
         throw new Error(

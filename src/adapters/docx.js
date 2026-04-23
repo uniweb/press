@@ -44,6 +44,7 @@ import {
     Bookmark,
     FootnoteReferenceRun,
 } from 'docx'
+import { fetchAsset } from '../assets/fetch.js'
 
 // ============================================================================
 // Public API
@@ -838,15 +839,15 @@ async function irToImageParagraph(node) {
 }
 
 /**
- * Fetch image data from a URL and return as ArrayBuffer.
- * Works in browser (via fetch + blob) and Node (via fetch + arrayBuffer).
+ * Fetch image bytes for a docx ImageRun.
+ *
+ * Thin wrapper over the shared src/assets/fetch.js helper — docx wants
+ * a raw ArrayBuffer (Uint8Array.buffer works too; the library accepts
+ * either). The shared helper is what EPUB and any future asset-embedding
+ * adapter use; see principle 6 ("Extract shared logic when a second
+ * adapter needs it") in docs/architecture/principles.md.
  */
 async function fetchImageData(url) {
-    const response = await fetch(url)
-
-    if (!response.ok) {
-        throw new Error(`HTTP error fetching image: ${response.status}`)
-    }
-
-    return response.arrayBuffer()
+    const { bytes } = await fetchAsset(url)
+    return bytes
 }
