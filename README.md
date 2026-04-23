@@ -127,10 +127,6 @@ Guides:
 - **[Citations](./docs/guides/citations.md)** — The `citestyle` + Press pattern for bibliographies in preview and docx.
 - **[Style pack](./docs/guides/style-pack.md)** — Copy-paste `paragraphStyles` and `numbering` definitions for hanging-indent and numbered bibliography entries.
 
-Migration:
-
-- **[Migration from phase 1](./docs/migration-from-phase-1.md)** — For readers holding phase-1 examples with `@uniweb/press/react` and `DownloadButton`.
-
 There is also a runnable demo at [`examples/preview-iframe/`](./examples/preview-iframe/) — a minimal standalone Vite app exercising the compile + preview + download flow end to end. It's not a Uniweb foundation; it's a plain React app demonstrating that Press works outside Uniweb as well.
 
 ## Subpath exports
@@ -161,6 +157,8 @@ Writing a custom adapter (Markdown, RTF, a domain-specific XML, a JSON export) i
 
 ## See also
 
+- [Press principles](./docs/architecture/principles.md) — the architectural commitments Press is built on (registration as the only mandatory contract, adapters dynamic-imported, no forced universal IR, semantic input stays upstream, etc.). Read this before proposing any change that touches the public surface or introduces a new format.
+- [Press architecture overview](./docs/architecture/overview.md) — contributor-oriented walk through how Press is put together.
 - [`@uniweb/loom`](https://github.com/uniweb/loom) — A small expression language for weaving data into text. The typical Uniweb report foundation uses a content handler that runs Loom's `instantiateContent` over the parsed content tree, resolving placeholders against live data before Press ever sees the section — which means dynamic reports look identical to static ones from Press's point of view.
 - [`@uniweb/kit`](https://github.com/uniweb/kit) — React components and hooks for building Uniweb foundations. The preview side of a Press-aware component typically uses Kit for theme-aware typography (`H1`, `H2`, `P`, `Prose`, `ChildBlocks`, `Visual`, etc.) alongside Press's builder components for the compiled output. See the [concepts doc](./docs/concepts.md) for the "same JSX vs separate preview" discussion.
 

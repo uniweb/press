@@ -8,11 +8,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Phase 1.6 restructure landed. 133 tests passing across 15 files. The registration architecture, builder components, IR layer, section templates, and docx adapter are stable. The public surface is expected to hold through 1.0. xlsx and PDF adapters are not yet implemented — adding one is a new file under `src/adapters/` plus an entry in the `ADAPTERS` map inside `src/useDocumentCompile.js`.
+The registration architecture, builder components, IR layer, section templates, and the docx, xlsx, and typst adapters are all in place, with 133+ tests across the suite. The public surface is expected to hold through 1.0. A new format adapter is a new file under `src/adapters/` plus an entry in the `ADAPTERS` map inside `src/useDocumentCompile.js` — and, when the format needs React primitives, a new `src/<format>/` barrel and a `./<format>` subpath in `package.json`'s `exports` field (mirroring how `/docx` and `/typst` are shaped).
 
-**Press is unpublished.** No external consumers yet, so there is no migration burden and no deprecation shims — changes that affect the public surface just change it.
+**Press is published on npm** (currently `0.3.0`). The public surface is still pre-1.0 and external adoption is minimal, so breaking changes are acceptable when justified — but treat each release as a published artifact: bump versions through the workspace publish script, and keep the `exports` field and documented subpaths coherent.
 
-Design and decisions are in `docs/design/restructure-2026-04.md` (in this directory). **Read it before making non-trivial changes** — the restructure is opinionated about which things belong at the root, which at `/docx`, which at `/sections`, which at `/ir`, and which stay internal. The revision history next to it (`restructure-2026-04-revision-history.md`) has the eight rounds of review that produced those decisions.
+Architectural anchor is a pair of docs with different jobs — consult whichever fits your task:
+
+- **`docs/architecture/principles.md`** — the constitution. Durable commitments about what Press is and is not (registration as the only mandatory contract, adapters dynamic-imported, no forced universal IR, semantic input stays upstream, etc.). Consult before making non-trivial design decisions or changes that touch the public surface. A change that violates a principle either needs a different approach or an explicit amendment to the principles file.
+- **`docs/architecture/overview.md`** — the map. Contributor-oriented description of how Press is actually put together: the registration store, the per-format fragment shapes, the compile dispatch, the adapter boundary. Consult when approaching an unfamiliar area or orienting to the codebase as a whole.
+
+A new contributor lands on overview.md first (orientation); a contributor about to make a design change consults principles.md (constraints); a contributor writing a new adapter reads both (patterns + rules). Active format roadmaps and implementation plans live alongside them under `docs/design/`.
 
 The data-attribute vocabulary is inherited verbatim from the legacy `@uniwebcms/report-sdk` — ~30 attributes covering layout, borders, headings, numbering, positional tabs, image transforms, hyperlinks, and floating positioning. The legacy pointers live in `kb/framework/reference/documents-legacy-references.md`. Do not redesign the vocabulary without good reason — foundation porting from the legacy SDK depends on exact names.
 
@@ -199,13 +204,12 @@ Tests use `@testing-library/react` with the `jsdom` Vitest environment. The comp
 
 ## Publishing
 
-Publishing is centralized at the workspace root via `pnpm framework:publish:*` (see root `CLAUDE.md`). The script auto-detects what needs publishing and cascades dependents. Do not run a per-package publish command from here. Press is currently unpublished; the first publish will happen when the public docs (R4c) and remaining restructure phases settle.
+Publishing is centralized at the workspace root via `pnpm framework:publish:*` (see root `CLAUDE.md`). The script auto-detects what needs publishing and cascades dependents. Do not run a per-package publish command from here. Press is live on npm (`@uniweb/press`, currently `0.3.0`); subsequent releases go through the same centralized pipeline.
 
 ## Cross-references
 
-- `docs/design/restructure-2026-04.md` — the phase-1.6 restructure plan (authoritative)
-- `docs/design/restructure-2026-04-revision-history.md` — eight-round review trail
-- `docs/design/historical/original-press-package-design.md` — pre-restructure design
+- **`docs/architecture/principles.md` — the architectural constitution. Read first before making non-trivial design decisions.** Any change that touches the public surface, introduces a new format adapter, or reshapes the IR layer should be consistent with the principles there (or explicitly propose amending them).
+- `docs/architecture/overview.md` — contributor-oriented walk through how Press is put together
 - `kb/framework/reference/documents-legacy-references.md` — legacy `@uniwebcms/report-sdk` pointers (source of the data-attribute vocabulary)
 - `framework/kit/CLAUDE.md` — convention reference (this package mirrors kit's no-build-step pattern)
 - `examples/preview-iframe/` — runnable demo of the compile + preview + download flow
