@@ -1,6 +1,6 @@
 # Quick start
 
-Ten minutes from `npm install` to a working Download button. The examples assume a Uniweb foundation — for a non-Uniweb React app, see the notes at the bottom of each section.
+Ten minutes from `npm install` to a working Download button. The examples assume a Uniweb foundation — for a non-Uniweb React app, see the [preview-iframe example](../examples/preview-iframe/) which demonstrates the same flow in a plain Vite app.
 
 ## Install
 
@@ -8,7 +8,7 @@ Ten minutes from `npm install` to a working Download button. The examples assume
 npm install @uniweb/press
 ```
 
-Press has a React peer dependency (18 or 19). It does not install `docx` for you — that library is bundled *inside* Press and loaded dynamically the first time you call `compile('docx')`.
+Press has a React peer dependency (18 or 19). It does not install `docx`, `exceljs`, or the Typst runtime for you — each format's heavy library is declared as a dependency of Press and loaded dynamically the first time you call `compile(format)`. A foundation that never calls `compile('docx')` never pays for the `docx` library.
 
 ## Write a section
 
@@ -34,7 +34,7 @@ function Cover({ content, block }) {
 
     useDocumentOutput(block, 'docx', body)
 
-    return <div className="max-w-4xl mx-auto">{body}</div>
+    return <div className='max-w-4xl mx-auto'>{body}</div>
 }
 
 export default Cover
@@ -42,9 +42,11 @@ export default Cover
 
 Three things to notice:
 
-1. **No `<section>` wrapper in the return value.** The Uniweb runtime wraps every section in `<section>` with a context class and background. The component returns just its inner layout. (In a non-Uniweb React app you'd wrap in `<section>` yourself, or use the `<Section>` helper from `@uniweb/press/sections` which does it for you.)
+1. **No `<section>` wrapper in the return value.** The Uniweb runtime wraps every section in `<section>` with a context class and background. The component returns just its inner layout. In a non-Uniweb React app you'd wrap in `<section>` yourself, or use the `<Section>` helper from `@uniweb/press/sections` which does it for you.
 2. **The same `body` is used twice.** It's registered for docx compilation *and* rendered as the visible preview. No drift because there's one JSX tree.
 3. **`content.paragraphs` is an array.** Uniweb's content shape uses plural, pre-parsed arrays. `Paragraphs` (plural) is the builder that accepts them; `Paragraph` (singular) is for one-at-a-time use.
+
+The same pattern works for other formats — substitute `'typst'` and `@uniweb/press/typst` builders to register a Typst fragment, or register a plain `{ title, headers, data }` object with `'xlsx'` for a spreadsheet. A section can register for more than one format in the same render.
 
 ## Match it to markdown
 
@@ -100,7 +102,7 @@ function ReportLayout({ children }) {
 
 Every `<Cover>` (or any other section component) that renders inside this tree and calls `useDocumentOutput` contributes its fragment to the compiled document. Sections that don't call the hook are ignored. You can freely mix opt-in and non-opt-in sections in the same page.
 
-In a Uniweb foundation, `ReportLayout` is typically a **layout component** at `src/layouts/ReportLayout/index.jsx` — see [agents.md](https://raw.githubusercontent.com/uniweb/docs/main/reference/kit-reference.md) for how layouts work. The `<DocumentProvider>` wraps the layout's `children` so every section in the page is in scope.
+In a Uniweb foundation, `ReportLayout` is typically a layout component at `src/layouts/ReportLayout/index.jsx`. The `<DocumentProvider>` wraps the layout's `children` so every section on the page is in scope.
 
 ## Add a Download button
 
@@ -125,7 +127,7 @@ function DownloadControls() {
 }
 ```
 
-`compile` returns the Blob; `triggerDownload` is a separate DOM utility that hands it to the browser. This split is deliberate — see the [preview pattern guide](./guides/preview-pattern.md) for the compile-then-preview-before-saving flow.
+`compile` returns the Blob; `triggerDownload` is a separate DOM utility that hands it to the browser. This split is deliberate — see [concepts](./concepts.md#compile-is-separate-from-download) for why and [the preview pattern guide](./guides/preview-pattern.md) for the compile-then-preview-before-saving flow.
 
 The docx library is fetched via dynamic import the first time `compile('docx')` runs, producing a separate bundle chunk that the browser loads on demand. Until then, your page pays only for the registration machinery (small, mostly React context) and whatever builder components you've imported.
 
@@ -177,7 +179,7 @@ function Summary({ content, block }) {
     )
 
     useDocumentOutput(block, 'docx', body)
-    return <div className="max-w-4xl mx-auto">{body}</div>
+    return <div className='max-w-4xl mx-auto'>{body}</div>
 }
 
 export default Summary
@@ -185,64 +187,22 @@ export default Summary
 
 The content author adds a second markdown file to the page, selects `Summary` as its type, and writes the content. When the user clicks Download, both registrations are walked in order and concatenated into one `.docx` file. See [multi-block reports](./guides/multi-block-reports.md) for how the provider orders them and what happens when sections mount and unmount.
 
-## Mixing preview and compiled output
+## Variations you'll probably want later
 
-The hello-world above uses Press's builder components as *both* the visible preview and the registered docx source. That's the simplest mode. Two other common modes:
+The hello-world above uses Press's builder components as *both* the visible preview and the registered docx source — the simplest mode. A few common variations:
 
-### Kit for preview, Press for docx
+- **Kit for preview, Press for docx.** Render richer theme-aware typography with Kit components in the visible output while registering a parallel Press-builder tree for compilation. Two trees, one structure.
+- **Compiled-only, no preview.** A section returns `null` but registers a fragment. Useful for footer metadata, hidden appendices, or a headless export where the site has no visible output at all.
+- **Compiled-blob preview.** Render the compiled `.docx` itself back into a sandboxed iframe via `docx-preview` for a high-fidelity cross-check view.
 
-If you want the richer theme-aware typography Kit provides for the visible preview while still compiling to docx, render them separately inside the same component:
-
-```jsx
-import { useDocumentOutput } from '@uniweb/press'
-import * as Docx from '@uniweb/press/docx'
-import { H1, H2, P } from '@uniweb/kit'
-
-function Cover({ content, block }) {
-    const { title, subtitle, paragraphs } = content
-
-    useDocumentOutput(block, 'docx', (
-        <>
-            <Docx.H1 data={title} />
-            <Docx.H2 data={subtitle} />
-            <Docx.Paragraphs data={paragraphs} />
-        </>
-    ))
-
-    return (
-        <div className="max-w-4xl mx-auto">
-            <H1 text={title} className="text-heading text-5xl font-bold" />
-            <H2 text={subtitle} className="text-subtle text-2xl mt-4" />
-            <P text={paragraphs} className="text-body mt-6" />
-        </div>
-    )
-}
-```
-
-The structure mirrors — heading, subtitle, paragraphs — but Kit handles the visible typography and Press handles the compiled file.
-
-### Compiled-only, no visible preview
-
-A component can register a fragment and render nothing visible at all. Useful for footer metadata, a hidden cover-letter, or a computed appendix that should appear only in the downloaded file:
-
-```jsx
-function FooterMeta({ content, block }) {
-    useDocumentOutput(block, 'docx', (
-        <Paragraph>
-            Generated {new Date().toISOString().slice(0, 10)}.
-        </Paragraph>
-    ), { role: 'footer' })
-
-    return null
-}
-```
-
-See the [concepts doc](./concepts.md) for the full discussion of the four modes (same JSX, separate preview, different shapes per medium, compiled-only).
+For the mental model behind these, see [concepts](./concepts.md). For the compiled-blob preview pattern specifically, see [the preview pattern guide](./guides/preview-pattern.md).
 
 ## Next steps
 
-- **[Concepts](./concepts.md)** — Why Press is shaped the way it is; the insight that a Uniweb site is already pure content; why compile is separate from download; why docx is a toolkit, not the framework.
-- **[Core API](./api/core.md)** — the four root-level exports in depth.
-- **[/docx reference](./api/docx.md)** — every builder component with examples.
-- **[The preview pattern](./guides/preview-pattern.md)** — if you also want to render the compiled `.docx` via `docx-preview` as a cross-check view, separate from the per-component React preview.
-- **[examples/preview-iframe/](../examples/preview-iframe/)** — a runnable standalone demo (non-Uniweb React app) exercising the whole compile + preview + download flow.
+- **[Concepts](./concepts.md)** — the full mental model: why Press is shaped the way it is, how the registration pattern fits into Uniweb, and the three foundation shapes (interactive report, multi-format, headless).
+- **[Publishing a book](./guides/book-publishing.md)** — whole-site compilation via `compileSubtree`, the Typst pipeline, same-source preview across an entire book.
+- **[Multi-block reports](./guides/multi-block-reports.md)** — how registrations accumulate and order across many sections.
+- **[Writing a custom adapter](./guides/custom-adapter.md)** — build a format Press doesn't ship.
+- **[examples/preview-iframe/](../examples/preview-iframe/)** — a runnable standalone demo (non-Uniweb React app) exercising compile + preview + download end to end.
+
+For the public subpaths and what each entry point exports, see the [README](../README.md#subpath-exports).
