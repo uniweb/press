@@ -31,6 +31,22 @@ const asEmptyObject = () => ({})
 const asTrue = () => true
 
 /**
+ * Coerce a numeric attribute value to an integer.
+ *
+ * HTML attributes are always strings; numeric docx-library options that
+ * flow through IR (e.g. EMU offsets on floating anchors) must be numbers,
+ * or the library's type guards silently fall back to a different code
+ * path — floating positioning, for example, treats a string `offset` as
+ * missing and reverts to `align` instead. Unparseable values pass through
+ * unchanged so non-numeric strings still reach the adapter's own
+ * conversion layer.
+ */
+const toInt = (v) => {
+    const n = parseInt(v, 10)
+    return Number.isFinite(n) ? n : v
+}
+
+/**
  * Explicit attribute → IR path mapping. Entries are listed in the same
  * order as the legacy switch for ease of cross-reference.
  */
@@ -88,6 +104,7 @@ export const attributeMap = {
     },
     'data-floating-horizontalposition-offset': {
         path: ['floating', 'horizontalPosition', 'offset'],
+        transform: toInt,
     },
     'data-floating-verticalposition-relative': {
         path: ['floating', 'verticalPosition', 'relative'],
@@ -97,6 +114,7 @@ export const attributeMap = {
     },
     'data-floating-verticalposition-offset': {
         path: ['floating', 'verticalPosition', 'offset'],
+        transform: toInt,
     },
 
     // Page breaks — maps to DocxParagraph({ pageBreakBefore: true })
