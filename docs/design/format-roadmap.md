@@ -10,17 +10,33 @@
 |---|---|---|---|---|
 | docx | `src/adapters/docx.js` | HTML-IR | Same-JSX via `/docx` builders; compiled-blob via `docx-preview` iframe | `docx` (~3.4 MB) |
 | xlsx | `src/adapters/xlsx.js` | Plain `{ title, headers, data }` | Foundation-defined (preview need not match the sheet; charts are a common choice) | `exceljs` |
-| typst (sources) | `src/adapters/typst.js` | HTML-IR | Same-JSX via `/typst` builders; compile-to-PDF via local `typst` CLI | `jszip` (for source bundle) |
+| typst (sources + server) | `src/adapters/typst.js` | HTML-IR | Same-JSX via `/typst` builders; compile-to-PDF via local `typst` CLI or server endpoint | `jszip` (for source bundle) |
+| pagedjs (`html` mode) | `src/adapters/pagedjs.js` | Rendered-HTML passthrough via `consumes: 'html'` | Same-bytes: the HTML Blob opens in a new tab, Paged.js paginates in-browser, user prints to PDF | Paged.js polyfill (CDN, ~100 KB, pinned to 0.4.3) |
+
+**Architectural note — adapter descriptors.** Shipped alongside Paged.js: adapter dispatch is now table-driven on `{ load, consumes, ir }` descriptors in `src/adapters/dispatch.js`. The `consumes` field lets multiple output formats share an input-shape key — Paged.js declares `consumes: 'html'`, and any future HTML-string adapter (EPUB, a plain-HTML export) can declare the same and read the foundation's existing `'html'` registrations with no foundation changes. The pipeline dispatches on `(consumes, ir)` rather than per-format `if`-branches. Principle 6 was amended to cover "generalization already earned" — see `../architecture/principles.md`.
 
 ## Near-term
 
-### PDF — Paged.js (browser-paginated, zero-backend)
+### PDF — Paged.js (remaining phases)
 
-**Status:** design doc at `./pagedjs-adapter.md`. Next up.
+**Status:** Phase 1 (`html` mode) **shipped**. Two follow-ups outstanding:
 
-**Why this one first.** Strong near-term demand (existing book-shaped sites already produce PDFs via Typst; Paged.js is the "no-backend, no-install" peer Download button for those same sites). The proposal is implementation-ready with a tight Phase 1 scope. Architecturally it validates two principles in code: principle 3 by introducing a *third* abstraction level (rendered HTML passthrough, distinct from HTML-IR and plain-data), and principle 4 by being an adapter that **skips** the IR layer entirely — the rendered HTML *is* the compile output. Principle 7 gets the purest case: preview and compile are literally the same bytes loaded in a browser tab.
+- **Server mode + Vite dev plugin** (`src/vite-plugin-pagedjs.js`, analogous to `vite-plugin-typst.js`). Headless Chromium + Paged.js + `page.pdf()` behind a `/__press/pagedjs/compile` endpoint. Wire protocol is already defined and the adapter's `server` mode is implemented and unit-tested with mocked fetch. What's missing: the dev plugin and production server-side reference. Ships when a site actually wants one-click PDF without the user invoking Print → Save as PDF.
+- **Deletion of `./pagedjs-adapter.md`.** The doc's own footer says to delete it once Phases 1–3 are shipped or explicitly punted. Phase 2 is CSS polish (already absorbed into the live default stylesheet), Phase 4 is "DRY the Download button" (deferred pending a third HTML-shape adapter). The doc can be deleted once server mode ships, at which point code + tests are the authoritative spec.
 
-**Backend:** none needed for Phase 1 (`html` mode). Phase 3 adds an optional server mode mirroring the Typst server pattern, for zero-interaction PDF delivery.
+### Running content customization (Paged.js) — deferred
+
+**Status:** design doc at `./pagedjs-running-content.md`. **Not scheduled.**
+
+A proposal for a `book.running` convention in `site.yml` that would let authors customize Paged.js margin-box content (running headers, footers, page-number formatting) without writing CSS. Today's default stylesheet already handles the common book case well; customization is done by passing extra CSS through `adapterOptions.stylesheet`.
+
+**Triggers for implementation:**
+- An author asks how to put the book title in the top-left margin on verso pages without writing CSS.
+- Two or more sites end up with near-identical CSS overrides for the same margin-box patterns (duplication signal → time to hoist into a convention).
+- A foundation wants to offer "per-book running-content customization" as a user-facing feature.
+- The author-facing guide (`../guides/book-publishing.md`) would benefit from a declarative YAML story instead of "write these CSS rules."
+
+**What it is not.** Not a prerequisite for anything else on this roadmap. Authors needing customization today use the stylesheet-concat escape hatch documented in `./pagedjs-running-content.md`.
 
 ## Medium-term
 
@@ -28,7 +44,11 @@
 
 **Status:** design doc at `./epub-adapter.md`. Scheduled after Paged.js.
 
-**Why worth doing.** Pure-frontend feasible (no backend, no WASM), small adapter (jszip is already a dep), and it exercises two commitments from `principles.md` that matter forward-looking: it adds a second consumer of the HTML-IR beyond docx (so principle 4's "fork if it bends" stance gets a real test), and it is the second adapter that needs asset fetching, which triggers the principle-5 extraction into a shared `src/assets/` helper. Complementary to Paged.js, not competing — Paged.js serves "I want a PDF of this book"; EPUB serves "I want to read this on an ebook reader."
+**Why worth doing.** Pure-frontend feasible (no backend, no WASM), small adapter (jszip is already a dep), complementary to Paged.js, not competing — Paged.js serves "I want a PDF of this book"; EPUB serves "I want to read this on an ebook reader."
+
+**What got cheaper after the Paged.js work.** With the adapter-descriptor + `consumes` alias shipped, EPUB can declare `{ load, consumes: 'html', ir: false }` and read the exact same `'html'` registrations that Paged.js already consumes. Foundations that already wire Paged.js get EPUB with zero foundation changes — the download button just picks a different format string. The proposed sharing is real and already tested in code via the Paged.js integration.
+
+**What EPUB still forces.** It's the second adapter that needs **asset fetching** (images embedded in the `.epub` archive rather than referenced by URL). Per principle 6's "promote shared logic on second use," this is the trigger for extracting `src/assets/fetch.js` from its current home inside `src/adapters/docx.js`. That extraction is the main architectural lift of the EPUB work.
 
 **Backend:** none needed.
 
@@ -70,7 +90,7 @@ Key unresolved questions when the time comes: who owns the endpoint (Press vs. p
 
 ### Asset fetching
 
-docx does asset fetching inline today. EPUB will be the second adapter needing it. Per principle 5, that's the trigger for extracting `src/assets/fetch.js` with a clean API (URL list in, `{ url → { bytes, mime } }` out). Slides, PDF, and anything else that embeds media inherits from that.
+docx does asset fetching inline today. Typst and Paged.js don't need it — Typst references images by URL (compiler resolves at compile time), Paged.js runs in a browser where the browser resolves URLs. EPUB will be the second adapter that genuinely needs embedded asset bytes. Per principle 6 ("Extract shared logic when a second adapter needs it"), that's the trigger for extracting `src/assets/fetch.js` with a clean API (URL list in, `{ url → { bytes, mime } }` out). Slides with embedded media, PDF via WASM (if fonts + images need bundling), and PPTX inherit from that.
 
 ### Theme / styles
 

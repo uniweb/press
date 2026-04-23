@@ -1,6 +1,6 @@
 # EPUB adapter — design
 
-**Status:** proposal, not yet implemented.
+**Status:** proposal, not yet implemented. Amended 2026-04-23 to reflect the adapter-descriptor refactor and `consumes` alias that shipped with Paged.js.
 **Last updated:** 2026-04-23.
 **Scope:** pure-frontend EPUB3 generation from Uniweb sections, plugged into Press's existing registration/compile pipeline. See also `./format-roadmap.md` for context on how EPUB fits the larger format space, and `../architecture/principles.md` for the commitments that shape the decisions below.
 
@@ -21,11 +21,23 @@
 
 ## Input shape
 
-**Reuse the existing HTML-IR** (what `src/ir/compile.js` already produces for docx and typst). This is the "right kind of sharing" per principle 3 — EPUB chapters are XHTML, so the HTML-IR is the natural abstraction. Forcing a new IR for EPUB would be duplication without benefit.
+**Declare `consumes: 'html'` in the adapter descriptor** (`src/adapters/dispatch.js`), reusing the same input-shape key Paged.js already reads.
 
-**Document-level structure (chapter boundaries, manifest, nav, spine) is owned by the adapter, not the IR.** Mirrors how the typst adapter owns `ChapterOpener` / template machinery while sharing the HTML-IR for inline/block content.
+Context: the adapter-dispatch refactor shipped with Paged.js (2026-04-23) introduced a `{ load, consumes, ir }` triple for each adapter. Paged.js declares `consumes: 'html', ir: false` — foundations register semantic HTML fragments under the `'html'` key, Paged.js reads them as rendered strings. EPUB can declare **`consumes: 'html', ir: false`** too: a foundation that already wired `useDocumentOutput(block, 'html', …)` for Paged.js gets EPUB registrations for free, no foundation changes.
 
-**Decision to confirm during implementation:** if the HTML-IR turns out to be docx-shaped in ways that actively bend for EPUB (e.g., docx-specific inline attributes that EPUB ignores or misinterprets), fork per principle 4. Do not distort the IR to pretend the two formats are more similar than they are.
+This is a change from the earlier lean ("reuse HTML-IR, shared with docx"). Three reasons the `'html'` passthrough is now the stronger default:
+
+1. **Proof of shape.** Paged.js validated rendered-HTML passthrough end-to-end on the framework-book site (289 pages, correct semantics, 339 tests green). We know the shape carries the information EPUB needs — semantic HTML with data-attributes foundations chose to attach.
+2. **Registration sharing actually pays off.** With `consumes: 'html'` shared, foundations write one registration. The earlier "shared HTML-IR" story implied docx-style registrations would serve EPUB, which is less natural — EPUB chapters are semantic web HTML, not docx-flavored IR.
+3. **Principle 6 carve-out already amended.** The "generalization already earned" paragraph added to `../architecture/principles.md` exists specifically because the alias seam was introduced with one adapter and clearly earned. Applying it here is consistent, not speculative.
+
+**Adapter work remains substantial.** EPUB needs chapter splitting (by Page), per-Page XHTML files, nav construction, manifest assembly, image URL collection and rewriting. The `'html'` input shape just means the adapter starts from rendered HTML strings and does a parse5 walk over them (parse5 is already a Press dep) — rather than starting from an IR the foundation pre-rendered through a format-specific set of builders.
+
+**HTML-IR reuse remains available as a fallback.** If it turns out the parse5 post-walk is clumsy for a specific EPUB need (e.g., semantic attributes the foundation attached that are easier to reach via IR than via an HTML parse), the adapter can switch to `consumes: 'docx'` or introduce `consumes: 'epub'` with its own registration key — per principle 4, abstraction level is per-format.
+
+**Document-level structure (chapter boundaries, manifest, nav, spine) is owned by the adapter, not the input shape.** Mirrors how the typst adapter owns `ChapterOpener` / template machinery while consuming the shared HTML-IR for inline/block content.
+
+**Empty-registrations warning.** Today's compile pipeline emits a one-time `console.warn` when no fragments are registered for an adapter's `consumes` key (see `CLAUDE.md` Gotchas). EPUB inherits this: a foundation that declares `compile('epub')` but never called `useDocumentOutput(block, 'html', …)` sees a helpful warning at click time, pointing at the right key to register under.
 
 ## Emitter choice
 
@@ -75,7 +87,7 @@ mybook.epub                          (ZIP — not compressed as a whole)
 
 ## Asset handling
 
-This is Press's **second adapter needing asset fetching** (docx does it inline today). Per principle 5, we extract at this point.
+This is Press's **second adapter needing asset fetching** (docx does it inline today). Typst and Paged.js don't — Typst references images by URL for its compiler to resolve; Paged.js runs in a browser that resolves URLs natively. EPUB is the format that forces embedded bytes. Per principle 6 ("Extract shared logic when a second adapter needs it"), now is the trigger.
 
 **Proposed new module: `src/assets/fetch.js`**
 
@@ -152,11 +164,8 @@ Mirror the docx test layout:
 
 ## Open questions (decide during implementation)
 
-1. **HTML-IR reuse vs. rendered-HTML passthrough (Paged.js-style).** The Paged.js adapter (`./pagedjs-adapter.md`) makes a deliberate choice to skip the IR entirely and consume rendered HTML strings — arguing that walking JSX → HTML → IR → HTML round-trips and loses information (nested classes, inline styles, data-attributes) that the foundation chose to put in the HTML. The same argument partly applies to EPUB, since EPUB chapters are XHTML. Two readings:
-   - **Reuse HTML-IR (current lean).** EPUB needs *more than* passthrough: chapter splitting, image URL collection and rewriting, nav doc generation, manifest construction. The IR provides a traversable structure for those transformations and is already well-tested by docx and typst.
-   - **Passthrough + post-walk.** Render each Page's JSX to an HTML string, then traverse with parse5 (already a Press dep) to collect image URLs and split on headings if needed. Sidesteps the docx-shaped assumptions baked into the current HTML-IR.
-   Resolve during implementation. If HTML-IR reuse turns out to be a clean fit (the IR carries image URLs and heading structure without distortion), stay with it. If the IR's docx-oriented attributes actively bend the EPUB XHTML output, fork the IR (per principle 4) or switch to passthrough. Either answer is consistent with the principles.
-2. **Do we need `/epub` builder components, or can foundations reuse `/docx` builders for the EPUB fragment?** Probably reuse initially — `/docx` builders emit HTML with `data-*` attributes; EPUB is HTML. Some docx-specific attributes (numbering, page breaks, Word-styles) are meaningless to EPUB; they can be ignored harmlessly. If friction emerges, introduce `/epub` as its own subpath.
+1. ~~**HTML-IR reuse vs. rendered-HTML passthrough.**~~ **Resolved (2026-04-23):** declare `consumes: 'html'` and take rendered HTML strings. See the "Input shape" section above. This decision is earned from Paged.js's shipped implementation, not speculated about. If concrete pain emerges during implementation (parse5 post-walk awkward for a specific EPUB need), the fallbacks are documented — switch to `consumes: 'docx'` (HTML-IR reuse) or introduce `consumes: 'epub'` (new key). Neither is expected to be needed.
+2. **Do we need `/epub` builder components?** Probably not — foundations already register semantic HTML for Paged.js under `'html'`. EPUB reuses the same registrations. The existing practice (foundations use Kit components like `<Render>` and `<Prose>` for HTML output) works. If EPUB-specific authoring emerges (e.g., `epub:type` attribute conventions for footnotes), introduce `/epub` as its own subpath then. `/docx` builder reuse is not the path — `/docx` builders carry docx-specific attributes, and routing foundations to register via docx builders *for EPUB* sends the wrong signal about the input-shape relationship.
 3. **Cover image: declared how?** Options: (a) a convention on metadata role (`{ cover: '/path/to/cover.png' }`); (b) a new `role: 'cover'` registration; (c) a site.yml field. Lean toward (a) — simplest, no new registration roles, consistent with how other EPUB metadata flows.
 4. **Multiple spines / split guides?** EPUB3 supports `guide` and `collection` elements for advanced structuring. Skip in v1.
 5. **Theme → CSS:** reuse `@uniweb/theming` token emission to produce the EPUB stylesheet, or ship a Press-authored minimal style pack? Probably consume theming tokens — EPUB readers respect CSS custom properties, and theme parity with the web view is valuable. Confirm during implementation.
@@ -167,9 +176,12 @@ Mirror the docx test layout:
 ```
 src/
 ├── adapters/
-│   └── epub.js                   (compileEpub, buildContainer, buildOpf,
-│                                   buildNav, buildChapter, emitXhtml)
-├── assets/                       (NEW — extracted per principle 5)
+│   ├── epub.js                   (compileEpub, buildContainer, buildOpf,
+│   │                               buildNav, buildChapter, emitXhtml)
+│   └── dispatch.js               (ADD entry to ADAPTERS:
+│                                   epub: { load: () => import('./epub.js'),
+│                                           consumes: 'html', ir: false })
+├── assets/                       (NEW — extracted per principle 6)
 │   └── fetch.js                  (fetchAssets, detectMime, hashContent;
 │                                   internal — adapters import directly,
 │                                   no barrel, not in package.json exports)
@@ -188,12 +200,11 @@ examples/
 └── preview-epub/                 (optional — can fold into preview-iframe instead)
     └── ...
 
-src/useDocumentCompile.js
-└── ADAPTERS map                   (add epub: () => import('./adapters/epub.js'))
-
 src/adapters/docx.js
 └── (REFACTOR) consume src/assets/fetch.js instead of inlined fetch
 ```
+
+The ADAPTERS map lives in `src/adapters/dispatch.js` (as of the adapter-descriptor refactor shipped 2026-04-23). The descriptor is `{ load, consumes, ir }` — not the older single-function form.
 
 ## Out of scope for v1 (explicit)
 

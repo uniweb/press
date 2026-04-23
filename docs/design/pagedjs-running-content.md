@@ -1,100 +1,80 @@
-# Paged.js running content — design
+# Paged.js running content — design (deferred)
 
-**Status:** proposal, ready to implement after review.
+**Status:** **deferred** — design shelved pending real author need. Do not implement yet. When an author actually asks for customized running content in a book PDF, this doc is the starting point.
 **Last updated:** 2026-04-23.
-**Scope:** extends the shipped Paged.js adapter (`./pagedjs-adapter.md`) with a book-foundation-level convention for running headers and footers. Independent of the original adapter's deletion plan — ships separately.
+**Scope:** would extend the shipped Paged.js adapter (`./pagedjs-adapter.md`) with a book-foundation-level convention for running headers and footers.
 
 ---
 
-## Problem
+## Why this is deferred
 
-The Paged.js adapter today supports running content only via CSS named strings (`string-set: chapter content()` + `@page @top-* { content: string(chapter); }`) and page counters. The default stylesheet uses this well for the common book case: chapter name in the top outer corner, page number in the bottom outer corner.
+The current default stylesheet (in `@proximify/book-pagedjs-default` and `DEFAULT_STYLESHEET` inside the Paged.js adapter) already produces good running content for the common book case: chapter name in the outer top corner via `string-set: chapter content()`, page number in the outer bottom corner via `counter(page)`. Both verso/recto variants are handled. A site that produces a book PDF today gets correct, book-typography-appropriate margin boxes without any configuration.
 
-Gaps:
+The proposal below would add a structured `book.running` block in `site.yml` for authors who want to customize running content without writing CSS. That's a lateral move from "author writes CSS" to "author writes YAML," both requiring a line or two of configuration. It's not an obvious improvement until a real author says they want the YAML form.
 
-- Authors can't customize running content without forking the stylesheet.
-- Verso/recto splits beyond named-string tricks need hand-written CSS.
-- No single `site.yml` location for "the book title goes top-left on verso."
+**Until then**, authors who need customization pass extra CSS rules through `adapterOptions.stylesheet`:
 
-## Non-goals
+```js
+import { stylesheet as defaultCss } from '@proximify/book-pagedjs-default'
 
-- Piping web-layout-area content (`layout/header.md` etc.) into print. Web and print are separate concerns by design.
-- Programmatic per-page running content ("different content on first 30 pages"). Expressible in CSS via named page contexts; not templated here.
-- Rich HTML running elements — images, floats, content larger than a margin box. Paged.js supports `position: running(…)` + `content: element(…)` for these; deferred to a follow-up when a real use case lands.
+const extraCss = `
+  @page :left  { @top-left  { content: "My Book Title"; } }
+  @page :right { @top-right { content: string(chapter); } }
+`
 
-## Convention
+adapterOptions: {
+  mode: 'html',
+  stylesheet: defaultCss + '\n' + extraCss,
+  // ...
+}
+```
 
-One block in `site.yml`, parsed as **[Loom](../../../loom/README.md) templates**. Loom is already a Press dependency (`@uniweb/loom`).
+One-line escape hatch. No framework change required.
 
-**Minimal useful example — one line:**
+## The proposal, for when the need arises
+
+### Convention
+
+One block in `site.yml`:
 
 ```yaml
 book:
   running:
+    # Minimal case — one line, adds "Page N / Total" in outer bottom corner.
     footer: "{page} / {total}"
 ```
 
-This adds "Page N / Total" in the outer bottom corner on both sides, leaves the chapter name in the outer top corner (from the default stylesheet), and is the entire authoring surface for a book that just wants slightly more informative page numbers.
-
-**Full example — all six slots:**
+Full surface, all keys optional:
 
 ```yaml
 book:
   running:
-    # All keys optional. Omitted keys keep the stylesheet default.
-    header:        "{book.title} — {chapter}"   # both sides
-    header-verso:  "{book.title}"               # overrides verso only
-    header-recto:  "{chapter}"                  # overrides recto only
+    header:        "{book.title} — {chapter}"
+    header-verso:  "{book.title}"
+    header-recto:  "{chapter}"
     footer:        "Page {page}"
     footer-verso:  "{page}"
     footer-recto:  "Page {page} of {total}"
 ```
 
-### Two kinds of placeholders
+### Placeholder syntax (no Loom)
+
+A small dot-path substituter in the adapter, ~10 LOC. Two kinds of placeholders, no other features:
 
 | Placeholder | Resolves | Becomes in CSS |
 |---|---|---|
-| `{book.title}`, `{book.author}`, any `{x.y.z}` path into `site.yml` / `website.config` | Compile time (Loom dot-path access) | Quoted string literal |
-| `{chapter}`, `{section}`, `{page}`, `{total}` | Runtime (browser) | `string(chapter)` / `string(section)` / `counter(page)` / `counter(pages)` |
+| `{x.y.z}` — any dot path into `runningVars` (e.g. `{book.title}`, `{book.author.family_name}`) | Compile time | Quoted string literal |
+| `{chapter}`, `{section}`, `{page}`, `{total}` — reserved tokens | Runtime (browser) | `string(chapter)` / `string(section)` / `counter(page)` / `counter(pages)` |
 
-Both kinds coexist in one template. Dynamic tokens flow through Loom as sentinel strings (Unicode PUA); the adapter detects sentinels in the rendered output and translates them into CSS function calls.
+No conditionals, no formatters, no transforms. Authors who want richer logic write CSS. The placeholders are **literal leaf tokens** — `{book.title}` substitutes a compile-time string, `{chapter}` emits a CSS function, that's the whole spec.
 
-**Example.** Author writes `"{book.title} — {chapter}"`. The adapter:
+Parsing: one regex to find `{…}` spans; for each span, test against the reserved-token list first, then treat it as a dot path. If it's neither (e.g. misspelled token, unresolved path), throw with slot context.
 
-1. Runs Loom with `vars = { book: bookCfg, site: websiteCfg, chapter: sentinel('chapter'), ... }`.
-2. Gets rendered string `"The Uniweb Framework — ␀chapter␁"`.
-3. Splits on sentinels, escapes literal segments, emits CSS function calls for sentinels.
-4. Produces:
-
-```css
-@page :left  { @top-left  { content: "The Uniweb Framework" " — " string(chapter); } }
-@page :right { @top-right { content: "The Uniweb Framework" " — " string(chapter); } }
-```
-
-### What Loom gives for free
-
-Authors get Loom's static-evaluation power for the compile-time parts:
-
-- **Dot-path access** — `{book.title}`, `{book.author.family_name}`.
-- **Missing-field cleanup** — Loom quietly drops clauses whose data is missing, so `"{book.subtitle}: {book.title}"` renders as `"The Uniweb Framework"` when no subtitle exists.
-- **Fallbacks & formatters** — any Loom construct over *static* data (Plain or Compact form; snippets if declared).
-
-Full Loom reference: `framework/loom/docs/language.md`.
-
-### The one constraint
-
-Dynamic tokens (`{chapter}`, `{section}`, `{page}`, `{total}`) are **simple placeholders**. Two safe patterns:
-
-1. **Bare token:** `{chapter}`
-2. **Concatenation with literals:** `{book.title} — {chapter}`, `Page {page} of {total}`
-
-Don't pipe dynamic tokens through `AS`, `TRUNCATED BY`, or any formatter — the sentinel string would be transformed before the adapter can read it, producing broken CSS. The adapter throws a slot-scoped error when it detects this.
-
-Per-page conditional logic ("suppress header on blank pages") belongs in CSS, not Loom: add a named page context in the stylesheet and declare `@page <name> { @top-left { content: none; } }`.
+Why not Loom: Loom's full language (filters, conditionals, formatters) would not work correctly on the runtime tokens (they're not strings until browser rendering), and the static-only subset authors would use is just `{x.y.z}` — five lines to implement. No dependency coupling, no "watch out for Loom transforms" gotcha.
 
 ### Position mapping (outer-corner default)
 
-Four CSS-margin-box positions, authorable via six keys. Matches book typography and the current default stylesheet — a site adopting `book.running` for the first time sees no layout shifts in unrelated positions:
+Four CSS-margin-box positions, six keys. Matches book typography and the current default stylesheet:
 
 | Key | `:left` (verso) | `:right` (recto) |
 |---|---|---|
@@ -105,96 +85,62 @@ Four CSS-margin-box positions, authorable via six keys. Matches book typography 
 | `footer-verso` | `@bottom-left` | — |
 | `footer-recto` | — | `@bottom-right` |
 
-Authors who want center or inner positions extend the stylesheet directly. The adapter doesn't try to cover every Paged.js margin box.
+Authors who want center or inner positions extend the stylesheet directly. The adapter doesn't cover every Paged.js margin box.
 
-## Non-negotiables
+### Implementation
 
-- **Omitting `book.running` changes nothing.** Existing output identical.
-- **Layout areas stay web-only.** No automatic passthrough. Authors reuse web data in print by referencing the same Loom variables explicitly.
-- **Short strings stand alone.** `footer: "{page}"` is the complete line.
-- **Allowlist is stable.** `chapter`, `section`, `page`, `total` in v1. New dynamic tokens require a design amendment.
-- **No new subpath.** All running-content logic lives inside `src/adapters/pagedjs.js`. If a second consumer emerges (EPUB? another HTML-string adapter?), principle 6 says extract then — not before.
+All inside `src/adapters/pagedjs.js`. No new subpath, no external dependency.
 
-## Implementation shape
-
-### Adapter (`src/adapters/pagedjs.js`)
-
-New `running` and `runningVars` options on `compilePagedjs`. The adapter owns everything — Loom invocation, sentinel management, CSS emission. Foundations don't touch Loom.
+**New adapter options:**
 
 ```js
 compilePagedjs(input, {
   mode: 'html',
   stylesheet,
   meta,
-  running: {                                      // NEW — raw YAML sub-object
-    header: '{book.title} — {chapter}',
-    footer: 'Page {page} of {total}',
-  },
-  runningVars: { book: bookCfg, site: websiteCfg },  // NEW — vars for Loom
+  running: website.config.book?.running,           // raw YAML sub-object
+  runningVars: { book: bookCfg, site: websiteCfg }, // data for {x.y.z} paths
 })
 ```
 
-Internally, the adapter:
+**Adapter work:**
+1. For each declared slot, parse `{…}` placeholders. Reserved tokens map to CSS functions; dot paths resolve via `runningVars`. Unresolved path → throw with slot name.
+2. Emit CSS: literal segments quoted and CSS-escaped; reserved tokens emitted as their mapped CSS function; the parts joined with spaces to form a valid `content:` value expression.
+3. Generate one `@page :left|:right { @top-left|@top-right|... { content: …; } }` rule per slot-side combination.
+4. Inject a `<style>` block **after** the foundation stylesheet so author overrides win on cascade.
 
-1. For each declared slot, runs Loom with `runningVars` plus sentinel entries for the four dynamic tokens at the root of the vars namespace (`chapter`, `section`, `page`, `total`). Reserved root-level names — document in the adapter API.
-2. Splits the rendered string on sentinels. Validates: no half-sentinels, no unknown token names between markers. Violations throw with the slot name.
-3. Emits CSS: literal segments quoted and CSS-escaped (`"` → `\"`, `\` → `\\`); sentinels mapped to `string(chapter)` / `string(section)` / `counter(page)` / `counter(pages)`.
-4. Generates one `@page :left { @<position> { content: ...; } }` rule per slot-side combination, respecting the six-key → four-position mapping.
-5. Injects a `<style>` block **after** the foundation stylesheet so author overrides win on cascade.
+**Foundation work:** pass `running` and `runningVars` through `adapterOptions`. ~4 LOC per book foundation.
 
-Adapter footprint: ~80 LOC added to the existing file. Loom stays a runtime dep (already is).
+### Non-negotiables
 
-### Foundations (`press-book`, `book-web`)
+- **Omitting `book.running` changes nothing** — default stylesheet runs unmodified.
+- **Layout areas stay web-only** — no automatic passthrough.
+- **Allowlist is stable** — `chapter`, `section`, `page`, `total` in v1. New tokens require a design amendment.
+- **No Loom.** A simple dot-path substituter does the job.
+- **Adapter-internal.** No new subpath or external module until a second consumer appears (principle 6).
 
-Four lines added to the Paged.js branch of each DownloadButton:
+### Testing (when implemented)
 
-```js
-adapterOptions: {
-  mode: 'html',
-  meta,
-  stylesheet: pagedjsStylesheet,
-  running: website.config.book?.running,                    // NEW
-  runningVars: { book: bookCfg, site: website.config },     // NEW
-}
-```
+~6 test cases in `tests/pagedjs/adapter.test.jsx`:
+1. Static-only template → quoted CSS string literal.
+2. Single reserved token → matching CSS function.
+3. Mixed static + reserved → concatenated CSS value.
+4. CSS-string escaping (`"` → `\"`, `\` → `\\`).
+5. Variant mapping: `header-verso` only emits `@page :left`.
+6. Unresolved dot path throws with slot name.
 
-If `book.running` is absent or empty, the adapter no-ops the entire feature — the stylesheet default runs unchanged.
+### Pre-merge verification (if/when implemented)
 
-### Default stylesheet (`@proximify/book-pagedjs-default`)
+Confirm Paged.js resolves `counter(pages)` to the post-pagination total page count. If broken, drop `{total}` from the allowlist.
 
-Unchanged. Authored overrides land *after* the default stylesheet; declared slots win, omitted slots keep the current default.
+### Size estimate
 
-## Testing (all in `tests/pagedjs/adapter.test.jsx`)
-
-1. Static-only template: `content: "Book Title";`.
-2. Single dynamic token: `content: string(chapter);`.
-3. Mixed static + dynamic: `content: "Book" " — " string(chapter);`.
-4. CSS-string escaping: literal containing `"` emits `\"`; containing `\` emits `\\`.
-5. Variant mapping: `header-verso` only emits `@page :left`, `:right` untouched.
-6. `total` correctly maps to `counter(pages)`.
-7. Author override wins over stylesheet default (injection-order invariant).
-8. Dynamic token inside a transform construct throws with slot name: `/running-content slot 'header'.*leaf position only/`.
-
-Approximately 8 test cases, one file, ~150 LOC test code.
-
-### Live check in Chrome
-
-- **framework-book** (no `book.running` configured): still paginates to 289 pages, default stylesheet unchanged.
-- **universities-book** with sample `book.running: { header: "{book.title} — {chapter}", footer: "Page {page} of {total}" }`: verify margin boxes render declared content on both verso and recto; book title + chapter name in top outer corner; "Page N of 289" in bottom outer corner.
-
-### Pre-merge verification (Phase-0 smoke test)
-
-Before merging: verify Paged.js actually resolves `counter(pages)` to the post-pagination total page count (not `0` or an in-progress value). If `counter(pages)` doesn't work, drop `{total}` from v1 and document as a known limitation.
-
-## Open questions
-
-1. **How should author-declared snippets fit in (future)?** Loom supports `new Loom(snippets, customFns)` — authors could declare reusable fragments like `bookTitle: "{book.title}"` in `site.yml` at `book.running.snippets`. Out of v1 scope; add if a real authoring pattern emerges.
-2. **What happens if the author uses `{total}` but Paged.js doesn't populate `counter(pages)` correctly?** Pre-merge verification above resolves this. If broken: drop `{total}` from the allowlist before shipping.
+~60 LOC added to `src/adapters/pagedjs.js` + ~8 LOC across two foundations + 6 tests. One commit per repo.
 
 ## What this is NOT
 
 - Not a way to reuse web layout areas in print.
-- Not a new Press format. Paged.js is already wired up; this extends its authoring surface.
+- Not a new Press format.
 - Not programmatic per-page logic — that's CSS.
-- Not a new template language — the templating is Loom, already shipped.
-- Not a new subpath or module — adapter-internal logic, extracted only if a second consumer materializes.
+- Not a new template language, not even Loom — a tiny dot-path substituter.
+- Not a priority until an author asks for it.
