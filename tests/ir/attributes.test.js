@@ -125,7 +125,7 @@ describe('attributesToProperties', () => {
             })
         })
 
-        it('maps data-floating-* to twice-nested floating object', () => {
+        it('maps data-floating-* to twice-nested floating object with numeric offsets', () => {
             const result = attributesToProperties([
                 { name: 'data-floating-horizontalposition-relative', value: 'page' },
                 { name: 'data-floating-horizontalposition-align', value: 'center' },
@@ -137,13 +137,38 @@ describe('attributesToProperties', () => {
                     horizontalPosition: {
                         relative: 'page',
                         align: 'center',
-                        offset: '100',
+                        offset: 100,
                     },
                     verticalPosition: {
                         relative: 'margin',
                     },
                 },
             })
+        })
+
+        it('coerces data-floating-*-offset attribute strings to integers', () => {
+            // HTML attributes are always strings, but the docx library's
+            // position builders type-check `offset` as a number and
+            // silently fall back to `align` when it isn't — the single
+            // most common floating-image bug. The IR walker therefore
+            // normalizes to Number at parse time. Negative values (for
+            // offsets that overrun page edges) and large EMU magnitudes
+            // must both round-trip.
+            const result = attributesToProperties([
+                { name: 'data-floating-horizontalposition-offset', value: '-140400' },
+                { name: 'data-floating-verticalposition-offset', value: '10288800' },
+            ])
+            expect(result.floating.horizontalPosition.offset).toBe(-140400)
+            expect(result.floating.verticalPosition.offset).toBe(10288800)
+        })
+
+        it('leaves unparseable floating offset values untouched', () => {
+            // Non-numeric values pass through as-is so the adapter's own
+            // conversion layer can still apply (or reject).
+            const result = attributesToProperties([
+                { name: 'data-floating-horizontalposition-offset', value: 'not-a-number' },
+            ])
+            expect(result.floating.horizontalPosition.offset).toBe('not-a-number')
         })
 
         it('maps data-underline to an empty object regardless of value', () => {
