@@ -62,6 +62,8 @@ Asset fetching, image metadata extraction, footnote collection, cross-reference 
 
 **In practice.** Do not create `src/assets/` (or similar) until a second adapter actually needs asset fetching. The first adapter owns the logic; the second occasion makes the right API obvious. If you catch yourself generalising a utility on first use because "we'll probably need it elsewhere," stop — the second adapter will tell you what the API should be, and guessing wrong is more expensive than moving the code later.
 
+**When the generalization is already earned.** This rule guards against speculation in gray areas — cases where the right abstraction shape depends on evidence you don't have. It does *not* require refusing obvious generalizations whose shape is already determined by the code that exists. If introducing the first instance of a family forces a design choice whose alternative is clearly wrong, make the generalization now rather than manufacturing duplication to satisfy the "wait for two" heuristic. The honest test: "is the shape of this abstraction decided by speculation about the second consumer, or by the first consumer plus existing contracts?" Speculation → wait. Determined → generalize.
+
 ### 7. Semantic input stays upstream
 
 Press consumes Uniweb's already-parsed semantic content graph. Adapters walk that graph and emit. They do not parse.

@@ -50,13 +50,16 @@ Once the shape is chosen, the work looks like this. Every step is required; most
 
 2. **Write the adapter.** One file at `src/adapters/<format>.js`, exporting `compile<Format>(compiledInput, documentOptions) → Promise<Blob>`. For HTML-based: walk the IR, dispatch by node type, emit. For data-shape: read the passed-through objects, build the output. For rendered-HTML passthrough: concatenate the rendered fragments, wrap in whatever shell the format needs.
 
-3. **Register the format in the `ADAPTERS` map** in `src/useDocumentCompile.js`:
+3. **Register the format in the `ADAPTERS` map** in `src/adapters/dispatch.js`:
    ```js
-   <format>: () => import('./adapters/<format>.js')
+   <format>: { load: () => import('./<format>.js'), consumes: '<input-key>', ir: <bool> }
    ```
-   This is the only place in Press that references the adapter module directly. The dynamic `import()` is what keeps the adapter out of the main bundle — see [principle 2](./principles.md#2-adapters-are-dynamic-imported).
+   Three fields:
+   - `load` — dynamic-imported adapter module. This is the only place in Press that references the adapter directly; the `import()` is what keeps it out of the main bundle ([principle 2](./principles.md#2-adapters-are-dynamic-imported)).
+   - `consumes` — the store key foundations register fragments under. May differ from the output format name when multiple formats share an input shape (e.g. pagedjs and future EPUB both declare `consumes: 'html'`; foundations register once under `'html'` and both adapters read it). Defaults to the format name when omitted — use that when the format has no shape-siblings.
+   - `ir` — `true` for adapters that walk each fragment into the IR tree (docx, typst); `false` for passthrough adapters that take HTML strings (pagedjs) or plain data objects (xlsx).
 
-4. **Update `compileOutputs` in `src/ir/compile.js`** only if the format needs a new dispatch branch. Most don't — passthrough is the default for non-HTML formats; HTML formats use the shared `compileHtmlBased`.
+4. **Don't touch `compileOutputs` in `src/ir/compile.js`** unless the format introduces a genuinely new input-shape family. The dispatch is table-driven off the descriptor's `(consumes, ir)` — IR-walk, HTML-passthrough, and data-passthrough are already covered. Adding a fourth branch only makes sense if the format is a new *kind* of thing (e.g. a streaming output, a pre-chunked input) — and at that point it's worth a design doc before coding.
 
 5. **If the format needs React builders, add them at `src/<format>/`** with a matching subpath in `package.json`'s `exports` field. Don't put the adapter itself in `exports` — users should always reach it through `useDocumentCompile` / `compileSubtree` so it stays lazy-loaded.
 

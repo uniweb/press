@@ -103,6 +103,19 @@ The IR parser uses `parse5` so it runs in Node and is unit-testable without jsdo
 
 ## Gotchas
 
+### Empty compile output usually means "no registrations for the adapter's input key," not "adapter is broken"
+
+Adapters declare a `consumes` key in the `ADAPTERS` descriptor (`src/adapters/dispatch.js`) — the store key whose fragments they read. The descriptor's output-format name and its `consumes` can differ:
+
+- `typst` consumes `'typst'` (self-aliased — most common case)
+- `docx`  consumes `'docx'` (same)
+- `xlsx`  consumes `'xlsx'` (same)
+- `pagedjs` consumes **`'html'`** — foundations register under `'html'`, not `'pagedjs'`. A future EPUB adapter will also consume `'html'`, so the foundation writes one registration and both adapters read it.
+
+When an adapter produces a valid-looking shell — doctype, metadata, stylesheet, all the right tags — with an empty body, the cause is almost always that foundation sections never called `useDocumentOutput(block, <consumes-key>, …)`. Check the descriptor's `consumes` value, not the output format name.
+
+Press emits a one-time `console.warn` per input-shape key from both `useDocumentCompile` and `compileSubtree`. The message names both the format and the key when they differ (`"compile('pagedjs') found 0 sections registered under input key 'html'."`) — follow that key to the foundation. See `tests/core/empty-registrations-warning.test.jsx` for the contract.
+
 ### docx image emission — three invariants for a Word-clean .docx
 
 Every `ImageRun` must satisfy all three of the following, or Word complains. The docx library does not enforce them for us, and each failure mode looks like a generic "corrupted docx" — they're easy to confuse. The header comment above `irToImageParagraph` in `src/adapters/docx.js` enumerates them; the regression guard is in `tests/docx/monograph-docx.test.jsx`.

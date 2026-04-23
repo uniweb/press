@@ -163,18 +163,20 @@ Notes:
 
 ### Layer 3: adapter dispatch registration
 
-Add one line to `src/adapters/dispatch.js`:
+Add one entry to `src/adapters/dispatch.js` as a `{ load, consumes, ir }` descriptor:
 
 ```js
 const ADAPTERS = {
-    docx: () => import('./docx.js'),
-    xlsx: () => import('./xlsx.js'),
-    typst: () => import('./typst.js'),
-    pagedjs: () => import('./pagedjs.js'),  // new
+    docx:    { load: () => import('./docx.js'),    consumes: 'docx',  ir: true  },
+    xlsx:    { load: () => import('./xlsx.js'),    consumes: 'xlsx',  ir: false },
+    typst:   { load: () => import('./typst.js'),   consumes: 'typst', ir: true  },
+    pagedjs: { load: () => import('./pagedjs.js'), consumes: 'html',  ir: false },  // new
 }
 ```
 
-And extend the compile-fn lookup in `runCompile`:
+The `consumes: 'html'` is load-bearing: foundation sections call `useDocumentOutput(block, 'html', …)`, not `'pagedjs'`. Keeps the foundation wiring stable when a future EPUB adapter lands — EPUB will also declare `consumes: 'html'` and read the same registrations with zero foundation changes. Principle 6's "When the generalization is already earned" carve-out (see `principles.md`).
+
+Extend the compile-fn lookup in `runCompile`:
 
 ```js
 const compileFn =
@@ -422,6 +424,7 @@ These don't need re-debating during implementation:
 4. **Multipart wire protocol for server mode** — same shape as Typst server mode (one field per file). Makes future Press infrastructure reusable.
 5. **`pagedjs` subpath for React builders is deferred.** No initial plan for `@uniweb/press/pagedjs` builders. Most sites emit HTML via Kit's existing components and don't need custom Press builders. Add only if a pattern emerges. Phase 5+ if ever.
 6. **Fonts are a foundation concern.** Press doesn't manage fonts; the foundation's stylesheet declares `@font-face` or uses `<link rel="stylesheet" ...>` — Paged.js inherits browser font behavior.
+7. **Adapter descriptor with `consumes:` alias, introduced with Paged.js (not deferred to second HTML adapter).** Adapters are `{ load, consumes, ir }` triples; foundations register under the input-shape key (`'html'`) while callers still name the output format (`'pagedjs'`). This is a principle-6 carve-out: the shape was determined by the first adapter plus the existing registration contract, not by speculation about EPUB. See principle 6's "When the generalization is already earned" paragraph for the test applied. Second HTML adapter (EPUB) will reuse the same `'html'` registrations with zero foundation changes.
 
 ## Open questions (decide during implementation)
 

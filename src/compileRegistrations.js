@@ -26,7 +26,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import DocumentProvider, { createStore } from './DocumentProvider.jsx'
 import { compileOutputs } from './ir/compile.js'
-import { runCompile } from './adapters/dispatch.js'
+import { runCompile, getAdapterDescriptor } from './adapters/dispatch.js'
 
 /**
  * @param {any} elements - React element or array of elements. Whatever you
@@ -67,7 +67,46 @@ export function compileRegistrations(elements, format, options = {}) {
         ),
     )
 
+    warnIfEmptyRegistrations(store, format)
     return compileOutputs(store, format)
+}
+
+/**
+ * Emit a one-time console warning when a compile finds no registrations
+ * under the adapter's `consumes` key. Catches the commonest cause of an
+ * "empty body" compile: foundation section components registered for a
+ * different input shape than the one the selected format reads from.
+ *
+ * The warning names the input-shape key (what the foundation should
+ * register under) rather than the output format, because that's where the
+ * fix lives. Silent when at least one output is present. Guarded with a
+ * Set so the same missed key only warns once per page.
+ *
+ * Unknown formats skip the warning — runCompile's "Unsupported document
+ * format" error is the right signal, not a misleading "0 sections" note.
+ */
+const _emptyKeyWarned = new Set()
+function warnIfEmptyRegistrations(store, format) {
+    const desc = getAdapterDescriptor(format)
+    if (!desc) return
+    const key = desc.consumes
+    if (_emptyKeyWarned.has(key)) return
+    const outputs = (store.getOutputs && store.getOutputs(key)) || []
+    if (outputs.length > 0) return
+    _emptyKeyWarned.add(key)
+    if (typeof console !== 'undefined' && console.warn) {
+        const note =
+            key === format
+                ? `compileSubtree('${format}') found 0 registered sections. ` +
+                  `Did any section component call useDocumentOutput(block, '${format}', ...)?`
+                : `compileSubtree('${format}') found 0 sections registered under input key '${key}'. ` +
+                  `Sections should call useDocumentOutput(block, '${key}', ...) ` +
+                  `(the output format '${format}' reads fragments registered under '${key}').`
+        console.warn(
+            `@uniweb/press: ${note} ` +
+                `Sections registered for a different input key do not cross-register.`,
+        )
+    }
 }
 
 /**
