@@ -314,6 +314,7 @@ Foundations pass both strings into the button as `preamble` / `template` props. 
 
 ## See also
 
+- [The compile pattern](./compile-pattern.md) — the four steps (gather → tree → compile → sink) named explicitly, and how the same shape works for browser Download buttons and headless tools (`unipress`).
 - [Concepts](../concepts.md) — the four ways to combine preview and registration, why compile is separate from download.
 - [The docusite pattern](./docusite.md) — short-form "URL IS the document" reports using the docx adapter.
 - [The preview pattern](./preview-pattern.md) — render a compiled Blob into an iframe as a cross-check, independent of the React preview.
