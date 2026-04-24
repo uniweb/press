@@ -220,6 +220,8 @@ These are **not** combined. The split exists because one of the most useful thin
 
 If `compile` automatically downloaded, any "compile and show me" workflow would either double-compile or work around the auto-download. Keeping them separate makes Press composable with any Blob-consuming library.
 
+The same separation lets Press serve callers other than the in-page Download button: a headless CLI, a server endpoint, a Web Worker, anything. The shape they all share is the same four steps — gather blocks, build a React tree, call `compileSubtree`, sink the Blob — with the gather-and-sink ends varying per host. See [the compile pattern](./guides/compile-pattern.md) for the explicit shape and side-by-side variants for browser Download buttons and headless tools.
+
 ## Lazy-loaded adapters
 
 The `docx` library is ~3.4 MB unminified — a significant cost to pay for users who never click Download. Press never pulls it into the main bundle. The format adapter at `src/adapters/docx.js` is reached *only* through a dynamic import inside `useDocumentCompile`:
