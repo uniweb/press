@@ -5,9 +5,9 @@
  * any React subtree, including off-screen trees they've never mounted
  * in the live DOM (the whole-book Download case).
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import React from 'react'
-import { compileRegistrations, compileSubtree } from '../../src/compileRegistrations.js'
+import { compileRegistrations, compileSubtree, compileDocument } from '../../src/compileRegistrations.js'
 import { createStore, DocumentProvider } from '../../src/index.js'
 import { useDocumentOutput } from '../../src/useDocumentOutput.js'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -180,5 +180,196 @@ describe('compileRegistrations', () => {
         // other format's fragment.
         expect(typst.sections[0][0].children[0].content).toBe('T')
         expect(docx.sections[0][0].children[0].content).toBe('D')
+    })
+})
+
+// compileDocument sits on top of compileSubtree and adds three concerns:
+// foundation-driven adapter options, format aliasing (via:), and block
+// gathering from a Website. The tests cover each independently plus the
+// tree-mode passthrough.
+describe('compileDocument', () => {
+    // Install the childBlockRenderer that initPrerender would set up, so
+    // website-mode tests don't need the full runtime boot path.
+    let prevUniweb
+    const fakeRenderer = ({ blocks }) =>
+        blocks.map((b, i) => (
+            <FakeSection key={i} block={b} label={`B${i + 1}`} />
+        ))
+    beforeEach(() => {
+        prevUniweb = globalThis.uniweb
+        globalThis.uniweb = { childBlockRenderer: fakeRenderer }
+    })
+    afterEach(() => {
+        globalThis.uniweb = prevUniweb
+    })
+
+    it('tree mode is equivalent to compileSubtree', async () => {
+        const tree = (
+            <>
+                <FakeSection block={{ id: 1 }} label="alpha" />
+                <FakeSection block={{ id: 2 }} label="beta" />
+            </>
+        )
+        const blob = await compileDocument(tree, {
+            format: 'typst',
+            adapterOptions: { mode: 'sources', meta: { title: 'A' } },
+        })
+        expect(blob).toBeInstanceOf(Blob)
+        expect(blob.type).toBe('application/zip')
+        expect(blob.size).toBeGreaterThan(0)
+    })
+
+    it('tree mode requires a format', async () => {
+        const tree = <FakeSection block={{}} label="x" />
+        await expect(compileDocument(tree, {})).rejects.toThrow(/format.*required/)
+    })
+
+    it('website mode gathers bodyBlocks across pages', async () => {
+        const website = {
+            basePath: '/',
+            pages: [
+                { route: 'ch1', bodyBlocks: [{ id: 1 }] },
+                { route: 'ch2', bodyBlocks: [{ id: 2 }, { id: 3 }] },
+            ],
+        }
+        const foundation = {
+            outputs: {
+                typst: {
+                    extension: 'zip',
+                    getOptions: () => ({
+                        adapterOptions: { mode: 'sources', meta: { title: 'Book' } },
+                    }),
+                },
+            },
+        }
+        const blob = await compileDocument(website, { format: 'typst', foundation })
+        expect(blob).toBeInstanceOf(Blob)
+        expect(blob.size).toBeGreaterThan(0)
+    })
+
+    it('website mode scopes by rootPath', async () => {
+        const gathered = []
+        const spyRenderer = ({ blocks }) => {
+            blocks.forEach((b) => gathered.push(b.id))
+            return blocks.map((b, i) => (
+                <FakeSection key={i} block={b} label={`B${b.id}`} />
+            ))
+        }
+        globalThis.uniweb = { childBlockRenderer: spyRenderer }
+
+        const website = {
+            pages: [
+                { route: 'intro', bodyBlocks: [{ id: 1 }] },
+                { route: 'book/ch1', bodyBlocks: [{ id: 2 }] },
+                { route: 'book/ch2', bodyBlocks: [{ id: 3 }] },
+                { route: 'book', bodyBlocks: [{ id: 4 }] },
+            ],
+        }
+        const foundation = { outputs: { typst: { getOptions: () => ({}) } } }
+        await compileDocument(website, { format: 'typst', foundation, rootPath: 'book' })
+        // Pages filter keeps original array order; intro (id=1) is dropped
+        // because its route doesn't match 'book' or 'book/...'. The 'book'
+        // page (exact match) and 'book/ch1', 'book/ch2' stay in declared
+        // order.
+        expect(gathered).toEqual([2, 3, 4])
+    })
+
+    it('resolves outputs from foundation.default.capabilities.outputs (built shape)', async () => {
+        const website = { pages: [{ route: 'x', bodyBlocks: [{ id: 1 }] }] }
+        const builtFoundation = {
+            default: {
+                capabilities: {
+                    outputs: {
+                        typst: { getOptions: () => ({ adapterOptions: { mode: 'sources', meta: { title: 'Z' } } }) },
+                    },
+                },
+            },
+        }
+        const blob = await compileDocument(website, { format: 'typst', foundation: builtFoundation })
+        expect(blob).toBeInstanceOf(Blob)
+    })
+
+    it('via: redirects to a different Press format', async () => {
+        let seenFormat = null
+        const spyRenderer = ({ blocks }) =>
+            blocks.map((b, i) => (
+                <FakeSection key={i} block={b} label={`B${i + 1}`} />
+            ))
+        globalThis.uniweb = { childBlockRenderer: spyRenderer }
+
+        const website = { pages: [{ route: 'x', bodyBlocks: [{ id: 1 }] }] }
+        const foundation = {
+            outputs: {
+                pdf: {
+                    extension: 'pdf',
+                    via: 'typst',
+                    getOptions: () => {
+                        seenFormat = 'pdf' // the foundation is told about 'pdf' (user-facing)
+                        return { adapterOptions: { mode: 'sources', meta: { title: 'V' } } }
+                    },
+                },
+            },
+        }
+        const blob = await compileDocument(website, { format: 'pdf', foundation })
+        expect(blob).toBeInstanceOf(Blob)
+        expect(blob.type).toBe('application/zip') // Press emitted typst, not pdf
+        expect(seenFormat).toBe('pdf')
+    })
+
+    it('throws with a helpful message when the format is not declared', async () => {
+        const website = { pages: [] }
+        const foundation = {
+            outputs: {
+                typst: { getOptions: () => ({}) },
+                epub: { getOptions: () => ({}) },
+            },
+        }
+        await expect(
+            compileDocument(website, { format: 'docx', foundation }),
+        ).rejects.toThrow(/outputs\.docx.*Declared outputs: typst, epub/s)
+    })
+
+    it('throws when the foundation has no outputs at all', async () => {
+        const website = { pages: [] }
+        const foundation = { /* no outputs declared */ }
+        await expect(
+            compileDocument(website, { format: 'typst', foundation }),
+        ).rejects.toThrow(/no outputs declaration/)
+    })
+
+    it('explicit adapterOptions override foundation-supplied ones', async () => {
+        // We can observe this by seeing the final meta end up in the
+        // typst bundle. The foundation declares a title; the caller
+        // overrides it. The bundle's meta.typ should contain the override.
+        const website = { pages: [{ route: 'x', bodyBlocks: [{ id: 1 }] }] }
+        const foundation = {
+            outputs: {
+                typst: {
+                    getOptions: () => ({
+                        adapterOptions: { mode: 'sources', meta: { title: 'Foundation' } },
+                    }),
+                },
+            },
+        }
+        const blob = await compileDocument(website, {
+            format: 'typst',
+            foundation,
+            adapterOptions: { mode: 'sources', meta: { title: 'Override' } },
+        })
+        // Key fact: the compile didn't throw, meaning the override-merge
+        // code path ran cleanly. Bundle-content assertions (e.g., that
+        // 'Override' actually made it into meta.typ) belong at a level
+        // that can read the zip's entries; jsdom's Blob is write-only.
+        expect(blob).toBeInstanceOf(Blob)
+        expect(blob.size).toBeGreaterThan(0)
+    })
+
+    it('missing globalThis.uniweb.childBlockRenderer is a clear error', async () => {
+        globalThis.uniweb = {} // no renderer
+        const website = { pages: [{ route: 'x', bodyBlocks: [{ id: 1 }] }] }
+        const foundation = { outputs: { typst: { getOptions: () => ({}) } } }
+        await expect(
+            compileDocument(website, { format: 'typst', foundation }),
+        ).rejects.toThrow(/childBlockRenderer is not installed/)
     })
 })

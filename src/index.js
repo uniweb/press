@@ -15,4 +15,5 @@ export { triggerDownload } from './triggerDownload.js'
 export {
     compileRegistrations,
     compileSubtree,
+    compileDocument,
 } from './compileRegistrations.js'

@@ -33,6 +33,30 @@ export function DownloadButton({ scope }) {
 
 The button is, architecturally, a wrapper around `compileSubtree`. The UI is incidental; the assembly is the point.
 
+## Full-document variant — `compileDocument`
+
+`compileSubtree` is the primitive — "I decided the tree, give me bytes." The common case, though, is "compile this whole website as a document through this foundation." That case involves three concerns `compileSubtree` leaves to the caller: gathering blocks, assembling format-specific adapter options (meta, preamble, template, cover assets, stylesheet), and mapping user-facing format names (like `pdf`) to the underlying Press adapter (like `typst`). `compileDocument` handles those.
+
+```js
+import { compileDocument } from '@uniweb/press'
+import foundation from '../foundation.js'
+
+const blob = await compileDocument(website, { format: 'pdf', foundation })
+```
+
+It reads `foundation.outputs[format]`, calls that entry's `getOptions(website, ...)`, optionally re-routes through the Press format declared by `via:`, gathers `website.pages[*].bodyBlocks`, and hands the whole thing to `compileSubtree`. Foundations declare the per-format details in one place; hosts (browser Download buttons, `unipress`, anything else) just say "compile this website as format X through this foundation."
+
+See [Foundations + headless hosts](#foundations--headless-hosts) below for how this lands on the foundation side.
+
+Two shapes:
+
+- **Website mode** — `compileDocument(website, { format, foundation, rootPath?, ...hostHints })`.
+  Gathers blocks (optionally scoped by `rootPath`), uses the foundation's declared outputs, returns a Blob.
+- **Tree mode** — `compileDocument(<tree>, { format, adapterOptions? })`.
+  A thin pass-through to `compileSubtree` for callers that assembled the tree themselves. Useful when the block selection policy isn't "every page" — e.g., a range slider that compiles a user-picked subset, or a preview that compiles one section. The outputs lookup is skipped in this mode; the caller supplies adapter options directly.
+
+`compileSubtree` remains the low-level primitive and is exported unchanged.
+
 ## Headless variant — `unipress` (Node)
 
 `unipress` is a CLI that compiles a content directory into a document file using a Uniweb foundation, with no browser. Same four steps, different sinks at the ends.
@@ -40,16 +64,21 @@ The button is, architecturally, a wrapper around `compileSubtree`. The UI is inc
 ```js
 import { writeFile } from 'node:fs/promises'
 
-const blocks = website.pages.flatMap(p => p.bodyBlocks ?? []) // (1)
-const tree = globalThis.uniweb.childBlockRenderer({ blocks }) // (2)  see note
-const blob = await foundation.compileSubtree(tree, 'typst', {}) // (3)  see note
-await writeFile(out, Buffer.from(await blob.arrayBuffer()))   // (4)
+const blob = await foundation.compileDocument(website, {  // (1)–(3)
+  format: 'pdf',
+  foundation,
+})
+await writeFile(out, Buffer.from(await blob.arrayBuffer()))  // (4)
 ```
 
-Two notes specific to headless callers:
+Steps 1–3 collapse into one call because `compileDocument` does the gathering, the tree-building, and the adapter-options assembly on the caller's behalf — reading the foundation's own outputs declaration. Steps 1 and 4 still vary per host (which blocks, where the bytes go); steps 2 and 3 stay fixed.
 
-- **`globalThis.uniweb.childBlockRenderer({ blocks })` instead of `<ChildBlocks blocks={blocks} />`.** Behaviorally identical — Kit's `<ChildBlocks>` literally calls `globalThis.uniweb.childBlockRenderer(props)`. The difference matters only because `@uniweb/kit` ships raw .jsx, and Node-side hosts often don't want a JSX loader in their toolchain. Using the renderer directly avoids that.
-- **`foundation.compileSubtree(...)` instead of `import { compileSubtree } from '@uniweb/press'`.** When a headless host imports `@uniweb/press` directly, it ends up with a different physical Press instance than the one bundled inside the foundation. The two have separate `DocumentContext` objects (separate `React.createContext()` calls), foundation registrations land in their bundled context, and `compileSubtree`'s wrapper looks at the host's context, finds nothing, and returns an empty Blob (with a `useDocumentOutput was called outside of a <DocumentProvider>` warning per registration). The fix is to reach the foundation's bundled Press through a re-export the foundation auto-emits when it depends on `@uniweb/press`. See [Foundations + headless hosts](#foundations--headless-hosts) below.
+If a host needs to customize step 1 — compile a subtree, a user-picked range, a single page — it can either pass `rootPath` (for path-based scoping) or fall back to `compileSubtree(tree, format, options)` with its own tree.
+
+Two notes on how headless callers reach these functions:
+
+- **`foundation.compileDocument(...)` instead of `import { compileDocument } from '@uniweb/press'`.** Same reason as `compileSubtree`: when a headless host imports `@uniweb/press` directly, it ends up with a different physical Press instance than the one bundled inside the foundation. The two have separate `DocumentContext` objects (separate `React.createContext()` calls), foundation registrations land in their bundled context, and the host-imported `compileSubtree`'s wrapper looks at the host's context, finds nothing, and returns an empty Blob (with a `useDocumentOutput was called outside of a <DocumentProvider>` warning per registration). The fix is to reach the foundation's bundled Press through re-exports the foundation auto-emits when it depends on `@uniweb/press` — see [Foundations + headless hosts](#foundations--headless-hosts) below. Both `compileSubtree` and `compileDocument` are re-exported this way.
+- **`globalThis.uniweb.childBlockRenderer` must be installed** before the website-mode call. Headless hosts call `initPrerender(content, foundation)` from `@uniweb/runtime/ssr` to set it up; browser runtimes install it automatically. Tree-mode callers don't need it (they pass their own tree).
 
 ## What the steps do *not* share
 
@@ -66,9 +95,47 @@ If a pattern emerges across many foundations — three or four with the same gat
 
 ## Foundations + headless hosts
 
-For a foundation to be reachable by a headless host (`unipress` today; potentially other tools later), it has to depend on `@uniweb/press` so the bundled copy of `compileSubtree` is exposed as `foundation.compileSubtree`. This happens automatically: when a foundation declares `@uniweb/press` in its `dependencies` (or `peerDependencies`), `@uniweb/build`'s entry generator appends `export { compileSubtree } from '@uniweb/press'` to the foundation's `_entry.generated.js`. The foundation's bundled `compileSubtree` becomes externally callable.
+For a foundation to be reachable by a headless host (`unipress` today; potentially other tools later), it has to depend on `@uniweb/press` so the bundled copy of the compile primitives is exposed on the foundation's built module. This happens automatically: when a foundation declares `@uniweb/press` in its `dependencies` (or `peerDependencies`), `@uniweb/build`'s entry generator appends `export { compileSubtree, compileDocument } from '@uniweb/press'` to the foundation's `_entry.generated.js`. Both functions become externally callable on the foundation's built module.
 
 Foundation devs writing onClick Download buttons don't need to know about this — the same import works in either world. The re-export only matters to the headless host calling in from outside.
+
+### Declaring outputs
+
+For `compileDocument(website, { format, foundation })` to work, the foundation declares its supported formats in a `outputs:` map on its default export:
+
+```js
+// foundation/src/foundation.js
+import { buildTypstOptions, buildPagedjsOptions } from './compile-options.js'
+
+export default {
+  defaultLayout: 'BookLayout',
+  outputs: {
+    typst: {
+      extension: 'zip',
+      getOptions: buildTypstOptions,
+    },
+    pdf: {
+      extension: 'pdf',
+      via: 'typst',                      // compile through the typst adapter
+      getOptions: buildTypstOptions,
+    },
+    pagedjs: {
+      extension: 'html',
+      getOptions: buildPagedjsOptions,
+    },
+  },
+}
+```
+
+Per-format fields:
+
+| Field | Required | Purpose |
+|---|---|---|
+| `getOptions(website, hostOptions) → { adapterOptions }` | No | Assembles format-specific adapter options (meta, preamble, template, assets, stylesheet, cover, …). `hostOptions` carries the rest-args passed to `compileDocument` (e.g., `mode: 'server'`, `endpoint`, `rootPath`) so the foundation can tailor. Returning nothing is equivalent to `{}`. |
+| `via` | No | Press format to compile through. Defaults to the output key itself. Use when the user-facing format name differs from the underlying Press adapter — e.g., `pdf` → `typst` when the host finishes the compile locally with a typst binary. |
+| `extension` | No | Default file extension for this output. Hosts use it when deriving an output filename. Conventional, not enforced. |
+
+A single output entry can serve both web and headless callers when the two want the same adapter options. If they diverge (e.g., browser pdf uses server mode with an endpoint, headless uses sources mode), `getOptions` can read those modes from `hostOptions` and branch accordingly.
 
 ## See also
 

@@ -142,3 +142,168 @@ export async function compileSubtree(elements, format, options = {}) {
     const compiled = compileRegistrations(elements, format, { basePath })
     return runCompile(format, compiled, adapterOptions)
 }
+
+/**
+ * Full-document compile via a foundation's declared outputs.
+ *
+ * Where `compileSubtree` is the low-level "I already decided the tree,
+ * give me bytes" primitive, `compileDocument` is the high-level "this
+ * website, compiled as a <format> document through this foundation"
+ * convenience. It handles three concerns compileSubtree doesn't:
+ *
+ *   1. Block selection — defaults to every page's bodyBlocks; a host
+ *      can narrow the scope with `rootPath` (only pages under that
+ *      route prefix).
+ *   2. Foundation-supplied adapter options — looks up
+ *      `foundation.outputs[format].getOptions(website, ...)` and
+ *      merges its return into the options passed to compileSubtree.
+ *      That's how a book foundation supplies preamble, template, meta,
+ *      and asset bytes without the host knowing anything about them.
+ *   3. Format aliasing — an output can declare `via: '<press-format>'`
+ *      to route compile through a different Press adapter. A foundation
+ *      can expose `outputs.pdf = { via: 'typst', ... }` so hosts ask
+ *      for 'pdf' while Press produces a typst source bundle; the host
+ *      (e.g., unipress) finishes the compile with the typst binary.
+ *
+ * Two call shapes:
+ *
+ *   - Tree mode: `compileDocument(<tree>, { format, ... })`.
+ *     The first argument is a React element. Treated as a direct
+ *     passthrough to compileSubtree — for hosts that already decided
+ *     which blocks to include and assembled the tree themselves. The
+ *     outputs lookup is skipped in this mode (no foundation needed).
+ *
+ *   - Website mode: `compileDocument(website, { format, foundation, rootPath, ... })`.
+ *     The first argument is a Website instance (or any object with a
+ *     `pages` array — we duck-type). Gathers blocks, builds the tree
+ *     via `globalThis.uniweb.childBlockRenderer({ blocks })`, looks up
+ *     `outputs[format]` on the foundation, calls its `getOptions`, and
+ *     routes through compileSubtree with the resulting adapterOptions
+ *     and basePath.
+ *
+ * The foundation argument accepts either the raw source shape (an
+ * object with `.outputs`) or the built-module shape (`.default.capabilities.outputs`).
+ * Browser Download buttons typically pass the source shape via a local
+ * relative import; headless hosts like unipress pass the built module
+ * they imported via URL.
+ *
+ * @param {import('react').ReactElement | Object} treeOrWebsite
+ * @param {Object} [options]
+ * @param {string} options.format - Output format name as declared on
+ *   the foundation (e.g. 'typst', 'pdf', 'epub', 'pagedjs').
+ * @param {Object} [options.foundation] - Foundation module, source or
+ *   built. Required for website mode; ignored in tree mode.
+ * @param {string} [options.rootPath] - Limit block gathering to pages
+ *   whose route is or lives under this prefix. Only meaningful in
+ *   website mode.
+ * @param {Object} [options.adapterOptions] - Caller-supplied adapter
+ *   options. Merged on top of whatever the foundation's getOptions
+ *   returns, so hosts can override.
+ * @param {string} [options.basePath] - DocumentProvider basePath. In
+ *   website mode, defaults to `website.basePath` if unset.
+ * @returns {Promise<Blob>}
+ */
+export async function compileDocument(treeOrWebsite, options = {}) {
+    const isElement =
+        treeOrWebsite !== null &&
+        typeof treeOrWebsite === 'object' &&
+        // React elements have a $$typeof symbol; duck-typing avoids needing
+        // `import { isValidElement } from 'react'` (minor, but keeps this
+        // file free of React imports it doesn't otherwise need).
+        Boolean(treeOrWebsite.$$typeof)
+
+    if (isElement) {
+        const { format, ...rest } = options
+        if (!format) {
+            throw new Error(
+                "compileDocument: 'format' is required (tree mode).",
+            )
+        }
+        return compileSubtree(treeOrWebsite, format, rest)
+    }
+
+    const website = treeOrWebsite
+    const {
+        format,
+        foundation,
+        rootPath,
+        adapterOptions: overrideAdapterOptions = {},
+        basePath: basePathOverride,
+        ...rest
+    } = options
+
+    if (!format) {
+        throw new Error(
+            "compileDocument: 'format' is required (website mode).",
+        )
+    }
+    if (!website || !Array.isArray(website.pages)) {
+        throw new Error(
+            'compileDocument: first argument must be either a React element ' +
+                '(tree mode) or a Website (website mode: expected object with ' +
+                'a pages array).',
+        )
+    }
+
+    const outputs = resolveFoundationOutputs(foundation)
+    const outputSpec = outputs?.[format]
+    if (!outputSpec) {
+        const declared = outputs ? Object.keys(outputs).join(', ') || '(none)' : '(no outputs declaration)'
+        throw new Error(
+            `compileDocument: foundation has no outputs.${format} declaration. ` +
+                `Declared outputs: ${declared}. ` +
+                "Add outputs[format] = { getOptions, extension?, via? } to the foundation's default export.",
+        )
+    }
+
+    const pressFormat = outputSpec.via ?? format
+    const foundationAdapterOptions = outputSpec.getOptions
+        ? await outputSpec.getOptions(website, { format, rootPath, ...rest })
+        : {}
+
+    const mergedAdapterOptions = {
+        ...foundationAdapterOptions.adapterOptions,
+        ...overrideAdapterOptions,
+    }
+
+    const blocks = gatherBlocks(website, rootPath)
+    const renderer = globalThis.uniweb?.childBlockRenderer
+    if (typeof renderer !== 'function') {
+        throw new Error(
+            'compileDocument: globalThis.uniweb.childBlockRenderer is not ' +
+                'installed. Either call initPrerender (headless) or mount a ' +
+                'Uniweb runtime (browser) before compileDocument, or pass a ' +
+                'pre-built tree (tree mode).',
+        )
+    }
+    const tree = renderer({ blocks })
+
+    return compileSubtree(tree, pressFormat, {
+        basePath: basePathOverride ?? website?.basePath,
+        ...foundationAdapterOptions,
+        adapterOptions: mergedAdapterOptions,
+    })
+}
+
+function resolveFoundationOutputs(foundation) {
+    if (!foundation) return null
+    if (foundation.outputs) return foundation.outputs
+    if (foundation.default?.capabilities?.outputs)
+        return foundation.default.capabilities.outputs
+    if (foundation.default?.outputs) return foundation.default.outputs
+    return null
+}
+
+function gatherBlocks(website, rootPath) {
+    const pages = website.pages || []
+    const scoped =
+        rootPath && typeof rootPath === 'string'
+            ? pages.filter(
+                  (p) =>
+                      p.route === rootPath ||
+                      (typeof p.route === 'string' &&
+                          p.route.startsWith(rootPath + '/')),
+              )
+            : pages
+    return scoped.flatMap((page) => page.bodyBlocks || [])
+}
