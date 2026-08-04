@@ -9,9 +9,8 @@
  * alongside the mark instead of trading one for the other.
  *
  * Not to be confused with the public <Link> builder, which is a different
- * contract: it takes `{ label, href }`, detects internal-vs-external, and
- * adds target/rel. This one takes a parsed part and always emits an external
- * hyperlink, matching what the builders did inline before.
+ * contract: it takes `{ label, href }` and adds target/rel. Both resolve an
+ * in-document anchor the same way (see below).
  */
 import TextRun from './TextRun.jsx'
 
@@ -21,8 +20,20 @@ export function labelRuns(part) {
 }
 
 export default function LinkPart({ part }) {
+    const href = part.href || ''
+
+    // An href starting with '#' is an in-document anchor, not a destination.
+    // Emitting it as an external hyperlink produced a relationship to the
+    // literal '#id' and no jump at all. The IR's anchor is a BARE bookmark
+    // name — `data-bookmark="x"` becomes `<w:bookmarkStart w:name="x"/>` — so
+    // the '#' is dropped here rather than shipped into `w:anchor`.
+    const anchor = href.startsWith('#') ? href.slice(1) : null
+    const linkAttrs = anchor
+        ? { 'data-type': 'internalHyperlink', 'data-anchor': anchor }
+        : { 'data-type': 'externalHyperlink', 'data-link': href }
+
     return (
-        <a data-type="externalHyperlink" data-link={part.href} href={part.href}>
+        <a {...linkAttrs} href={href}>
             {labelRuns(part).map((run, i) => (
                 <TextRun
                     key={i}

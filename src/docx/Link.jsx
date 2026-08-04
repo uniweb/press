@@ -33,8 +33,15 @@ export default function Link({ data, ...props }) {
         )
     }
 
+    // The IR's anchor is a BARE bookmark name — `data-bookmark="x"` becomes
+    // `<w:bookmarkStart w:name="x"/>` — so a documented `href: '#section-3'`
+    // has to lose its '#' or `w:anchor="#section-3"` never matches
+    // `w:name="section-3"` and Word resolves nothing. `href` keeps the
+    // fragment form, which is what the browser preview needs.
+    const anchor = href.startsWith('#') ? href.slice(1) : href
+
     return (
-        <a data-type="internalHyperlink" data-anchor={href} href={href} {...props}>
+        <a data-type="internalHyperlink" data-anchor={anchor} href={href} {...props}>
             <span data-type="text" data-style="Hyperlink">
                 {label || href}
             </span>

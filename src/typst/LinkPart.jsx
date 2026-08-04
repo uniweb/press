@@ -11,6 +11,13 @@
  * one takes sub/superscript and a Hyperlink style). Parameterising one shared
  * component over those differences would need more knobs than either version
  * has lines.
+ *
+ * Unlike the docx copy, this one does NOT special-case an in-document anchor
+ * (`href="#id"`). That is deliberate: the typst adapter has no
+ * `internalHyperlink` case, so emitting one would drop the link entirely,
+ * whereas `#link("#id")` at least renders its label. Typst addresses
+ * in-document targets through labels rather than URL fragments, so wiring
+ * this up means teaching the adapter that concept first.
  */
 import TextRun from './TextRun.jsx'
 

@@ -178,6 +178,17 @@ Hyperlink component with automatic external/internal detection.
 
 The component renders an `<a>` with `data-type="externalHyperlink"` or `data-type="internalHyperlink"` plus a nested `<span data-type="text" data-style="Hyperlink">` for the label. The docx adapter emits an `ExternalHyperlink` or `InternalHyperlink` with a styled `TextRun` child.
 
+**An in-document link needs a target, and it resolves by name.** Word matches `<w:hyperlink w:anchor="x">` against `<w:bookmarkStart w:name="x"/>`, so the link only works if some paragraph carries the matching bookmark:
+
+```jsx
+<Link data={{ label: 'See Section 3', href: '#section-3' }} />   // the link
+<Paragraph data-bookmark="section-3">Section 3</Paragraph>       // the target
+```
+
+Write the href either way — `#section-3` or `section-3`. The leading `#` is the HTML spelling and is dropped before it reaches the anchor; the bookmark name never carries one. A link with no matching bookmark compiles cleanly and simply doesn't navigate, so it is worth checking the pair exists.
+
+The same applies inside a `data` string: `<a href="#section-3">…</a>` becomes an in-document anchor, while anything else — including a URL that merely carries a fragment, like `https://example.edu/report#part-2` — stays an external link.
+
 ## `<List>` and `<Lists>`
 
 Nested bullet lists. Each list item can carry paragraphs, images, links, and child lists.
