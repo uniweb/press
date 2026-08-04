@@ -155,13 +155,14 @@ The browser preview renders a regular `<img src=…>`. The docx adapter reads `d
 
 ## `<Link>` and `<Links>`
 
-Hyperlink component with automatic external/internal detection.
+Hyperlink component. A `#fragment` becomes an in-document anchor; every other href is a destination.
 
 ```jsx
-// External: href starts with "http"
+// Destination — anything that isn't a fragment
 <Link data={{ label: 'Research Office', href: 'https://example.edu' }} />
+<Link data={{ label: 'Email us', href: 'mailto:office@example.edu' }} />
 
-// Internal: href is an in-document anchor
+// In-document anchor — a fragment, and only a fragment
 <Link data={{ label: 'See Section 3', href: '#section-3' }} />
 
 // Bare string shortcut — label and href are the same
@@ -185,9 +186,11 @@ The component renders an `<a>` with `data-type="externalHyperlink"` or `data-typ
 <Paragraph data-bookmark="section-3">Section 3</Paragraph>       // the target
 ```
 
-Write the href either way — `#section-3` or `section-3`. The leading `#` is the HTML spelling and is dropped before it reaches the anchor; the bookmark name never carries one. A link with no matching bookmark compiles cleanly and simply doesn't navigate, so it is worth checking the pair exists.
+Write the fragment form, `#section-3`. The `#` comes off before it reaches the anchor — bookmark names never carry one — but it is what marks the href as in-document, so a bare `section-3` is a destination, not an anchor. That is deliberate: `section-3` and `page.html` are indistinguishable, and reading bare tokens as bookmark names is what used to turn page links into dead anchors. A link with no matching bookmark compiles cleanly and simply doesn't navigate, so it is worth checking the pair exists.
 
-The same applies inside a `data` string: `<a href="#section-3">…</a>` becomes an in-document anchor, while anything else — including a URL that merely carries a fragment, like `https://example.edu/report#part-2` — stays an external link.
+The same rule applies inside a `data` string, from the same code — `<a href="#section-3">…</a>` is an anchor, and anything else is a destination, including a URL that merely carries a fragment (`https://example.edu/report#part-2`).
+
+> **Press emits every other href verbatim and does not interpret it.** A framework reference like `page:installation` is not resolved here — Press has no `@uniweb/*` dependency and no awareness of the host runtime, exactly as it doesn't resolve cite keys or xref ids. **Resolve authored hrefs before handing strings to these builders**; an unresolved one compiles to a link pointing at the literal text, which is a visible symptom rather than a silent one.
 
 ## `<List>` and `<Lists>`
 

@@ -1,11 +1,13 @@
 /**
  * Link component for document output.
  *
- * Auto-detects external (http) vs internal (anchor) hyperlinks.
+ * Emits an in-document anchor for a `#fragment` and a destination for
+ * everything else. See `classifyHref` for why that is the whole rule.
  *
  * @param {Object} props
  * @param {Object} props.data - Link data: { label, href }
  */
+import { classifyHref } from './classifyHref.js'
 
 export default function Link({ data, ...props }) {
     if (!data) return null
@@ -14,18 +16,11 @@ export default function Link({ data, ...props }) {
 
     if (!href) return null
 
-    const isExternal = href.startsWith('http')
+    const { anchor } = classifyHref(href)
 
-    if (isExternal) {
+    if (anchor !== null) {
         return (
-            <a
-                data-type="externalHyperlink"
-                data-link={href}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                {...props}
-            >
+            <a data-type="internalHyperlink" data-anchor={anchor} href={href} {...props}>
                 <span data-type="text" data-style="Hyperlink">
                     {label || href}
                 </span>
@@ -33,15 +28,20 @@ export default function Link({ data, ...props }) {
         )
     }
 
-    // The IR's anchor is a BARE bookmark name — `data-bookmark="x"` becomes
-    // `<w:bookmarkStart w:name="x"/>` — so a documented `href: '#section-3'`
-    // has to lose its '#' or `w:anchor="#section-3"` never matches
-    // `w:name="section-3"` and Word resolves nothing. `href` keeps the
-    // fragment form, which is what the browser preview needs.
-    const anchor = href.startsWith('#') ? href.slice(1) : href
+    // `target`/`rel` only affect the React preview, never the compiled
+    // document, so they stay on the narrower http test they have always
+    // used — opening a mailto: or a site path in a new tab is not what
+    // this component previously did and is not what this change is about.
+    const offSite = href.startsWith('http')
 
     return (
-        <a data-type="internalHyperlink" data-anchor={anchor} href={href} {...props}>
+        <a
+            data-type="externalHyperlink"
+            data-link={href}
+            href={href}
+            {...(offSite ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+            {...props}
+        >
             <span data-type="text" data-style="Hyperlink">
                 {label || href}
             </span>

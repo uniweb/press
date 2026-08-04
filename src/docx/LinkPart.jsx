@@ -13,6 +13,7 @@
  * in-document anchor the same way (see below).
  */
 import TextRun from './TextRun.jsx'
+import { classifyHref } from './classifyHref.js'
 
 /** `parts` is absent only for a hand-built part; fall back to the label. */
 export function labelRuns(part) {
@@ -22,15 +23,15 @@ export function labelRuns(part) {
 export default function LinkPart({ part }) {
     const href = part.href || ''
 
-    // An href starting with '#' is an in-document anchor, not a destination.
-    // Emitting it as an external hyperlink produced a relationship to the
-    // literal '#id' and no jump at all. The IR's anchor is a BARE bookmark
-    // name — `data-bookmark="x"` becomes `<w:bookmarkStart w:name="x"/>` — so
-    // the '#' is dropped here rather than shipped into `w:anchor`.
-    const anchor = href.startsWith('#') ? href.slice(1) : null
-    const linkAttrs = anchor
-        ? { 'data-type': 'internalHyperlink', 'data-anchor': anchor }
-        : { 'data-type': 'externalHyperlink', 'data-link': href }
+    // Same rule as the <Link> builder, from the same module rather than a
+    // second copy of the condition — the two used to classify the same href
+    // differently, which is what let `mailto:` compile to a dead anchor on
+    // one path and a working link on the other.
+    const { anchor } = classifyHref(href)
+    const linkAttrs =
+        anchor !== null
+            ? { 'data-type': 'internalHyperlink', 'data-anchor': anchor }
+            : { 'data-type': 'externalHyperlink', 'data-link': href }
 
     return (
         <a {...linkAttrs} href={href}>

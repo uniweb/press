@@ -36,13 +36,30 @@ describe('in-document anchors', () => {
             expect(anchorOf(documentXml)).toBe('section-3')
         })
 
-        it('still accepts a bare bookmark name', async () => {
+        // Everything that is NOT a fragment is a destination. These all used
+        // to compile to `w:anchor="<the href>"` — a bookmark that cannot
+        // exist — which does not merely fail to navigate: an anchor name is
+        // not a URL, so the destination was destroyed and unrecoverable.
+        //
+        // `section-3` is in this list deliberately. It is indistinguishable
+        // from `page.html`, so accepting a bare token as a bookmark name is
+        // exactly what turned page links into dead anchors. '#' disambiguates.
+        it.each([
+            ['mailto:', 'mailto:someone@example.edu'],
+            ['tel:', 'tel:+15551234567'],
+            ['a site path', '/about'],
+            ['a relative path', '../sibling'],
+            ['a bare filename', 'page.html'],
+            ['a bare token', 'section-3'],
+            ['an unresolved framework reference', 'page:installation'],
+        ])('emits %s as a destination, never an anchor', async (_label, href) => {
             const { documentXml } = await compileInvoice(
                 <Paragraph>
-                    <Link data={{ label: 'See Section 3', href: 'section-3' }} />
+                    <Link data={{ label: 'x', href }} />
                 </Paragraph>,
             )
-            expect(anchorOf(documentXml)).toBe('section-3')
+            expect(anchorOf(documentXml)).toBeNull()
+            expect(documentXml).toMatch(/<w:hyperlink[^>]*r:id=/)
         })
     })
 
@@ -79,6 +96,30 @@ describe('in-document anchors', () => {
             )
             expect(anchorOf(documentXml)).toBeNull()
             expect(documentXml).toMatch(/<w:hyperlink[^>]*r:id=/)
+        })
+    })
+
+    // The two paths classified the same href differently until they were put
+    // on one shared rule: `mailto:` was a working link written one way and a
+    // dead anchor written the other. Divergence, not either verdict, was the
+    // defect — so this asserts agreement rather than a particular shape.
+    describe('both authoring paths agree', () => {
+        it.each([
+            ['#section-3'],
+            ['mailto:someone@example.edu'],
+            ['/about'],
+            ['page:installation'],
+            ['https://e.com'],
+        ])('classifies %s the same either way', async (href) => {
+            const viaBuilder = await compileInvoice(
+                <Paragraph>
+                    <Link data={{ label: 'x', href }} />
+                </Paragraph>,
+            )
+            const viaData = await compileInvoice(
+                <Paragraph data={`<a href="${href}">x</a>`} />,
+            )
+            expect(anchorOf(viaBuilder.documentXml)).toBe(anchorOf(viaData.documentXml))
         })
     })
 

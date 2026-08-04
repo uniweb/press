@@ -100,6 +100,19 @@ The legacy SDK mutated `block.output[format]` from inside React render. We do no
 
 Foundations can use `useDocumentOutput` + builders directly and skip `/sections` entirely. `Section` is a register-and-render convenience; `StandardSection` is an opinionated content-shape renderer with a `renderChildBlocks` escape hatch. `StandardSection` duck-types on the content shape (`content.title`, `content.paragraphs`, etc.) and does not import from `@uniweb/core`, so non-Uniweb projects that produce the same shape get it for free.
 
+### Press emits; the caller resolves — links included
+
+Press has **no `@uniweb/*` dependency** and must keep it that way. The boundary is already stated in two places and links now follow it too:
+
+- `DocumentProvider` — *"Consumers pass this from their runtime … Press itself has no awareness of the host runtime"* (that's why `basePath` is a plain string argument).
+- `src/latex/insets.js` — *"Resolution stays foundation-side … The foundation passes already-resolved key arrays in. **Press's job is the emission shape.**"* (cite keys, xref ids).
+
+So for a link, Press decides **shape** — in-document anchor vs destination — and nothing else. `src/docx/classifyHref.js` is the whole rule: a `#fragment` is an anchor, everything else is a destination emitted verbatim. Both docx paths (`<Link>` and a parsed `data` string via `LinkPart`) import it, because they previously carried the condition separately and drifted — `mailto:` was a working link written one way and a dead anchor written the other.
+
+**Do not teach Press to resolve `page:` / `topic:` references.** They are Uniweb's stable-reference syntax (`docs/authoring/linking.md`), resolved by `makeHref` in `@uniweb/core` against a page-id map Press does not have and should not acquire. Reimplementing it here would duplicate a resolver that lives in the runtime — the failure mode the framework already hit with its route matcher, which was written twice and diverged. An unresolved reference compiles to a link pointing at the literal string; that is the intended symptom, and the fix belongs in whatever hands Press the string.
+
+If a compiled document ever needs a `page:` link to become a real in-document jump, the missing pieces are outside Press: a bookmark per section (a foundation writing `data-bookmark={block.stableId}`) and resolution by the caller, which has `useWebsite()` and kit's `resolveHref` / `resolveProseHrefs`. Nothing in Press blocks that, and nothing in Press should implement it.
+
 ### `LinkPart` is duplicated per lane, deliberately
 
 `src/docx/LinkPart.jsx` and `src/typst/LinkPart.jsx` render a parsed `link` part from `parseStyledString`. They look like an obvious candidate for one shared component and are not: the two emit different `data-type` values (`externalHyperlink` vs `link`), pass the href on different attributes (`data-link` vs `data-href`), import different `TextRun`s, and forward different marks (docx takes sub/superscript plus a `Hyperlink` character style; typst takes `code`). Parameterising over that needs five knobs for a component that is twenty lines — the abstraction would be larger than both copies.
