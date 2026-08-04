@@ -7,6 +7,7 @@
  */
 import { parseStyledString } from '../docx/parseStyledString.js'
 import TextRun from './TextRun.jsx'
+import LinkPart from './LinkPart.jsx'
 
 export default function Heading({ level = 1, id, data, children, ...props }) {
     const clamped = Math.min(Math.max(level, 1), 6)
@@ -20,27 +21,7 @@ export default function Heading({ level = 1, id, data, children, ...props }) {
             <Tag data-type="heading" data-level={clamped} {...idAttr} {...props}>
                 {parts.map((part, i) =>
                     part.type === 'link' ? (
-                        <a
-                            key={i}
-                            data-type="link"
-                            data-href={part.href}
-                            href={part.href}
-                        >
-                            {(part.parts?.length
-                                ? part.parts
-                                : [{ content: part.content }]
-                            ).map((run, j) => (
-                                <TextRun
-                                    key={j}
-                                    bold={run.bold}
-                                    italics={run.italics}
-                                    underline={!!run.underline}
-                                    code={run.code}
-                                >
-                                    {run.content}
-                                </TextRun>
-                            ))}
-                        </a>
+                        <LinkPart key={i} part={part} />
                     ) : (
                         <TextRun
                             key={i}

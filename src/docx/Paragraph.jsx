@@ -12,6 +12,7 @@
  */
 import { parseStyledString } from './parseStyledString.js'
 import TextRun from './TextRun.jsx'
+import LinkPart from './LinkPart.jsx'
 import Math from './Math.jsx'
 
 /**
@@ -76,35 +77,7 @@ export default function Paragraph({
             <Tag data-type="paragraph" {...polish} {...props}>
                 {parts.map((part, i) => {
                     if (part.type === 'link') {
-                        // A link's label is one or more styled runs, so a mark
-                        // on either side of the <a> survives. `parts` is absent
-                        // only for a hand-built part; fall back to the label.
-                        const runs = part.parts?.length
-                            ? part.parts
-                            : [{ content: part.content }]
-
-                        return (
-                            <a
-                                key={i}
-                                data-type="externalHyperlink"
-                                data-link={part.href}
-                                href={part.href}
-                            >
-                                {runs.map((run, j) => (
-                                    <TextRun
-                                        key={j}
-                                        style="Hyperlink"
-                                        bold={run.bold}
-                                        italics={run.italics}
-                                        underline={!!run.underline}
-                                        subscript={run.subscript}
-                                        superscript={run.superscript}
-                                    >
-                                        {run.content}
-                                    </TextRun>
-                                ))}
-                            </a>
-                        )
+                        return <LinkPart key={i} part={part} />
                     }
                     if (part.type === 'math') {
                         return (

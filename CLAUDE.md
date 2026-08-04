@@ -45,9 +45,12 @@ src/
 │   ├── Image.jsx
 │   ├── Link.jsx
 │   ├── List.jsx
+│   ├── LinkPart.jsx             ← INTERNAL — renders a parsed `link` part
+│   │                              (NOT Link.jsx: different contract)
 │   └── parseStyledString.js     ← INTERNAL helper (not in barrel)
 │
 ├── typst/                       ← PUBLIC /typst — React builder components
+│   └── LinkPart.jsx             ← INTERNAL — this lane's copy (see below)
 │
 ├── sections/                    ← PUBLIC /sections — higher-level templates
 │   ├── index.js
@@ -96,6 +99,14 @@ The legacy SDK mutated `block.output[format]` from inside React render. We do no
 ### Section helpers are sugar, not required
 
 Foundations can use `useDocumentOutput` + builders directly and skip `/sections` entirely. `Section` is a register-and-render convenience; `StandardSection` is an opinionated content-shape renderer with a `renderChildBlocks` escape hatch. `StandardSection` duck-types on the content shape (`content.title`, `content.paragraphs`, etc.) and does not import from `@uniweb/core`, so non-Uniweb projects that produce the same shape get it for free.
+
+### `LinkPart` is duplicated per lane, deliberately
+
+`src/docx/LinkPart.jsx` and `src/typst/LinkPart.jsx` render a parsed `link` part from `parseStyledString`. They look like an obvious candidate for one shared component and are not: the two emit different `data-type` values (`externalHyperlink` vs `link`), pass the href on different attributes (`data-link` vs `data-href`), import different `TextRun`s, and forward different marks (docx takes sub/superscript plus a `Hyperlink` character style; typst takes `code`). Parameterising over that needs five knobs for a component that is twenty lines — the abstraction would be larger than both copies.
+
+What they replaced was worse than duplication between *lanes*: the same block was inlined in **four** builders (`Paragraph` and `Headings` in each lane), so a change had to be made four times. Two copies split along a real boundary is the floor here, not a smell to clean up.
+
+**Neither is in its barrel** — they're internal, like `parseStyledString`. Don't confuse `LinkPart` with the public `Link` builder: `Link` takes `{ label, href }`, detects internal-vs-external, and adds `target`/`rel`; `LinkPart` takes a parsed part with styled runs and always emits an external hyperlink.
 
 ### No types
 

@@ -9,6 +9,7 @@
  */
 import { parseStyledString } from './parseStyledString.js'
 import TextRun from './TextRun.jsx'
+import LinkPart from './LinkPart.jsx'
 
 function Heading({ level, data, children, ...props }) {
     const Tag = `h${level}`
@@ -20,29 +21,7 @@ function Heading({ level, data, children, ...props }) {
             <Tag data-type="paragraph" data-heading={`HEADING_${level}`} {...props}>
                 {parts.map((part, i) =>
                     part.type === 'link' ? (
-                        <a
-                            key={i}
-                            data-type="externalHyperlink"
-                            data-link={part.href}
-                            href={part.href}
-                        >
-                            {(part.parts?.length
-                                ? part.parts
-                                : [{ content: part.content }]
-                            ).map((run, j) => (
-                                <TextRun
-                                    key={j}
-                                    style="Hyperlink"
-                                    bold={run.bold}
-                                    italics={run.italics}
-                                    underline={!!run.underline}
-                                    subscript={run.subscript}
-                                    superscript={run.superscript}
-                                >
-                                    {run.content}
-                                </TextRun>
-                            ))}
-                        </a>
+                        <LinkPart key={i} part={part} />
                     ) : (
                         <TextRun
                             key={i}
