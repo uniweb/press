@@ -118,6 +118,29 @@ The IR parser uses `parse5` so it runs in Node and is unit-testable without jsdo
 
 ## Gotchas
 
+### A green suite is not evidence the document is right — compile it and read the XML
+
+This package's output is a **document**, and a wrong document looks exactly like a right one from the terminal. Nothing here throws: the build passes, the suite passes, Word opens the file without a repair prompt, and the content is wrong. That is the default failure mode in this repo, not an unusual one.
+
+Three defects found in a single session (2026-08-04), all in code that had passing tests:
+
+| Defect | What the terminal said | What Word showed |
+|---|---|---|
+| `<a href="…"><strong>x</strong></a>` | green | the literal text `<strong>x</strong>` — the tags as content |
+| `<Link data={{href: '#section-3'}} />` | green | a link that navigates nowhere (`w:anchor="#section-3"` never matches `w:name="section-3"`) |
+| builder→`TextRun` prop forwarding | green | correct output; deleting the forwarding stayed green, so nothing guarded it |
+
+The first two were found by compiling a fixture and reading `document.xml`. The third was found by asking what the existing tests actually covered, then deleting the code to see whether anything failed. **Neither is reasoning from the builder source, and reasoning from the builder source would have found none of them.**
+
+Practical consequences:
+
+- **When the claim is about what the document contains, assert on compiled output**, not on the parsed parts or the IR. Both intermediate layers were correct in the anchor case; the defect was one hop later. `compileInvoice` from `tests/integration/invoice-fixtures/_harness.jsx` returns `documentXml` — assert against that, and scope the regex to the element you mean (`<w:hyperlink …>…</w:hyperlink>`) so it can't pass on markup elsewhere in the file.
+- **Canary every new guard.** Revert the fix (`git stash push -- src/`), run the new tests, and confirm they fail. A test written after a fix passes trivially; only the failing run proves it bites. Two of the sessions's test additions were verified this way, and in both the count of failing-vs-passing was itself informative — the tests that still passed were the intended non-regression guards.
+- **Vitest intercepts `console.log`**, so printing a value from a test shows nothing. To inspect a compiled artifact, assert it equals a sentinel (`expect(xml).toBe('SHOW')`) and read the diff, or write to a file with `node:fs`.
+- **For a pure refactor, diff the rendered markup** rather than trusting the suite. `renderToStaticMarkup` over a matrix of inputs, captured before and after, is a stronger claim than "534 tests still pass" — the suite only covers the paths it covers.
+
+This is the same lesson as the Word-repair recipe below, one stage earlier: that one diagnoses a file Word *rejects*, this one a file Word *accepts* and renders wrongly.
+
 ### Empty compile output usually means "no registrations for the adapter's input key," not "adapter is broken"
 
 Adapters declare a `consumes` key in the `ADAPTERS` descriptor (`src/adapters/dispatch.js`) — the store key whose fragments they read. The descriptor's output-format name and its `consumes` can differ:
