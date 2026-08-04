@@ -1,7 +1,7 @@
 /**
- * Parses a styled string with inline HTML marks (<strong>, <em>, <u>, <a>,
- * <span data-type="math">) into an array of text / link / math part
- * objects with style flags.
+ * Parses a styled string with inline HTML marks (<strong>/<b>, <em>/<i>, <u>,
+ * <sub>, <sup>, <a>, <span data-type="math">) into an array of text / link /
+ * math part objects with style flags.
  *
  * Ported from legacy report-sdk/src/utils.js:116-186, extended to support
  * <a href="..."> hyperlinks so paragraphs with auto-linked emails and URLs

@@ -2,8 +2,9 @@
  * Block-level text container with optional styled string parsing.
  *
  * - Without `data`: renders children directly with data-type="paragraph".
- * - With `data`: parses the HTML string for inline marks (<strong>, <em>,
- *   <u>) and hyperlinks (<a href="...">) and renders as styled children.
+ * - With `data`: parses the HTML string for inline marks (<strong>, <em>, <u>,
+ *   <sub>, <sup>) and hyperlinks (<a href="...">) and renders as styled
+ *   children. A mark composing with a link applies to the link's label.
  *
  * The `as` prop changes the rendered HTML element (default: <p>).
  *
@@ -42,8 +43,9 @@ function paragraphPolishProps({ tabStops, indent, role }) {
  * Block-level text container with optional styled string parsing.
  *
  * - Without `data`: renders children directly with data-type="paragraph".
- * - With `data`: parses the HTML string for inline marks (<strong>, <em>,
- *   <u>) and hyperlinks (<a href="...">) and renders as styled children.
+ * - With `data`: parses the HTML string for inline marks (<strong>, <em>, <u>,
+ *   <sub>, <sup>) and hyperlinks (<a href="...">) and renders as styled
+ *   children. A mark composing with a link applies to the link's label.
  *
  * @param {Object} props
  * @param {React.ElementType} [props.as='p'] - Element to render.
