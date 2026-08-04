@@ -79,10 +79,26 @@ Inline styled text span. Maps to a docx `TextRun`.
 
 Props:
 
-- **`bold`** — boolean. Sets `data-bold="true"`.
-- **`italics`** — boolean. Sets `data-italics="true"`.
-- **`underline`** — boolean. Sets `data-underline="true"`.
-- **`style`** — string style id, e.g. `"Hyperlink"` for clickable link styling.
+Run formatting — all booleans, each setting the matching `data-*` attribute:
+
+- **`bold`** — sets `data-bold="true"`.
+- **`italics`** — sets `data-italics="true"`.
+- **`underline`** — sets `data-underline="true"`.
+- **`strike`** — sets `data-strike="true"`. Emits `<w:strike/>`.
+- **`smallCaps`** — sets `data-smallcaps="true"`. Emits `<w:smallCaps/>`.
+- **`allCaps`** — sets `data-allcaps="true"`. Emits `<w:caps/>`.
+- **`subscript`** / **`superscript`** — set `data-subscript` / `data-superscript`. Emit `<w:vertAlign w:val="subscript"/>` / `"superscript"`. The two are mutually exclusive, since a run has one vertical alignment; if both are set, `subscript` wins.
+
+Direct formatting. Prefer a `role` (below) when you'd describe the text as *being* something — a label, a title. Reach for these when the value is one-off or computed; see [the named-styles note](../architecture/word-styles-decision.md) for where the boundary sits.
+
+- **`color`** — hex, with or without a leading `#`, or a theme key (`'accent'`, `'body'`, `'muted'`, `'softBorder'`). Theme keys resolve against the active `<DocumentProvider theme={…}>`; literals pass through with any `#` stripped.
+- **`size`** — font size in **half-points**, so 28pt is `56`. `convertPointsToHalfPoints` (exported from `@uniweb/press/docx`) keeps that doubling visible at the call site.
+- **`font`** — family name (`'Calibri'`) or a theme key (`'body'`, `'heading'`, `'mono'`).
+
+Everything else:
+
+- **`role`** — references a named OOXML character style, e.g. `role="Label"`. See [Typography roles](./typography-roles.md); inline props above override it.
+- **`style`** — string style id, e.g. `"Hyperlink"` for clickable link styling. Takes precedence over `role`.
 - **`children`** — text content.
 - **`...rest`** — forwarded as `data-*` attributes. Used for positional tabs:
 
