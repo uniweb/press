@@ -114,4 +114,43 @@ describe('enriched builder components', () => {
         expect(marks.some((m) => m.italics && m.content === 'italic')).toBe(true)
         expect(marks.some((m) => m.underline && m.content === 'under')).toBe(true)
     })
+
+    // Sub/superscript is the first run-formatting flag reaching the adapter from
+    // BOTH directions — a JSX prop on <TextRun> and a <sub>/<sup> tag inside a
+    // `data` string. strike/smallCaps/allCaps are prop-only, so the builders'
+    // part -> prop forwarding is new surface here rather than a copy of a tested
+    // path. Without this, dropping the forwarding in Paragraph/Headings leaves
+    // the parseStyledString and TextRun unit tests green.
+    it('IR preserves sub/superscript marks from a data string', () => {
+        const markup = <Paragraph data="CO<sub>2</sub> at x<sup>2</sup> scale" />
+        const html = renderToStaticMarkup(markup)
+        const ir = htmlToIR(html)
+
+        const marks = (ir[0].children || [])
+            .filter((c) => c.type === 'text')
+            .map((c) => ({
+                content: c.content,
+                subScript: c.subScript === 'true' || c.subScript === true,
+                superScript: c.superScript === 'true' || c.superScript === true,
+            }))
+
+        expect(marks.some((m) => m.subScript && m.content === '2')).toBe(true)
+        expect(marks.some((m) => m.superScript && m.content === '2')).toBe(true)
+    })
+
+    it('IR preserves a superscript mark from a heading data string', () => {
+        const markup = <H1 data="Results x<sup>2</sup>" />
+        const html = renderToStaticMarkup(markup)
+        const ir = htmlToIR(html)
+
+        const marks = (ir[0].children || []).filter((c) => c.type === 'text')
+
+        expect(
+            marks.some(
+                (m) =>
+                    (m.superScript === 'true' || m.superScript === true) &&
+                    m.content === '2',
+            ),
+        ).toBe(true)
+    })
 })

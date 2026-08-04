@@ -32,7 +32,7 @@ The most common builder. Renders a block-level text container.
 
 Props:
 
-- **`data`** — optional string. If present, the string is parsed for inline marks (`<strong>`, `<b>`, `<em>`, `<i>`, `<u>`) and rendered as a sequence of styled `<TextRun>` children. If absent, the component renders `children` directly.
+- **`data`** — optional string. If present, the string is parsed for inline marks (`<strong>`, `<b>`, `<em>`, `<i>`, `<u>`, `<sub>`, `<sup>`) and rendered as a sequence of styled `<TextRun>` children. If absent, the component renders `children` directly.
 - **`as`** — optional tag name (default `'p'`). Use `as="div"` when you want an HTML block that isn't a `<p>` — most commonly inside the table pattern below.
 - **`children`** — used when `data` is not provided.
 - **`...rest`** — any extra `data-*` attribute is forwarded to the rendered element and picked up by the IR walker. This is how you express layout, spacing, borders, bullets, and numbering:
