@@ -26,7 +26,20 @@ export default function Heading({ level = 1, id, data, children, ...props }) {
                             data-href={part.href}
                             href={part.href}
                         >
-                            <span data-type="text">{part.content}</span>
+                            {(part.parts?.length
+                                ? part.parts
+                                : [{ content: part.content }]
+                            ).map((run, j) => (
+                                <TextRun
+                                    key={j}
+                                    bold={run.bold}
+                                    italics={run.italics}
+                                    underline={!!run.underline}
+                                    code={run.code}
+                                >
+                                    {run.content}
+                                </TextRun>
+                            ))}
                         </a>
                     ) : (
                         <TextRun

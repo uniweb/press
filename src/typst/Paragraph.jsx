@@ -23,6 +23,13 @@ export default function Paragraph({ as: Tag = 'p', data, children, ...props }) {
             <Tag data-type="paragraph" {...props}>
                 {parts.map((part, i) => {
                     if (part.type === 'link') {
+                        // A link's label is one or more styled runs, so a mark
+                        // on either side of the <a> survives. `parts` is absent
+                        // only for a hand-built part; fall back to the label.
+                        const runs = part.parts?.length
+                            ? part.parts
+                            : [{ content: part.content }]
+
                         return (
                             <a
                                 key={i}
@@ -30,7 +37,17 @@ export default function Paragraph({ as: Tag = 'p', data, children, ...props }) {
                                 data-href={part.href}
                                 href={part.href}
                             >
-                                <span data-type="text">{part.content}</span>
+                                {runs.map((run, j) => (
+                                    <TextRun
+                                        key={j}
+                                        bold={run.bold}
+                                        italics={run.italics}
+                                        underline={!!run.underline}
+                                        code={run.code}
+                                    >
+                                        {run.content}
+                                    </TextRun>
+                                ))}
                             </a>
                         )
                     }

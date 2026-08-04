@@ -10,8 +10,14 @@
  * than being walked as opaque DOM (which turns MathML into raw operator
  * text).
  *
+ * A `link` part carries `parts` — the styled runs making up its label — because
+ * a mark composes with an <a> from either side (`<strong><a>…</a></strong>` or
+ * `<a><strong>…</strong></a>`) and a label can mix runs (`x<sup>2</sup>`).
+ * `content` remains the flat plain-text label for callers that only want a
+ * string.
+ *
  * @param {string} inputString - HTML string with inline marks.
- * @returns {Array<{type: string, content?: string, bold?: boolean, italics?: boolean, underline?: object, href?: string, latex?: string, display?: boolean}>}
+ * @returns {Array<{type: string, content?: string, bold?: boolean, italics?: boolean, underline?: object, subscript?: boolean, superscript?: boolean, href?: string, parts?: Array<object>, latex?: string, display?: boolean}>}
  *
  * @example
  * parseStyledString('Hello <strong>World</strong>')
@@ -21,10 +27,15 @@
  * // ]
  *
  * @example
- * parseStyledString('Visit <a href="https://example.com">Example</a>')
+ * parseStyledString('Visit <a href="https://example.com"><strong>Example</strong></a>')
  * // => [
  * //   { type: 'text', content: 'Visit ' },
- * //   { type: 'link', content: 'Example', href: 'https://example.com' }
+ * //   {
+ * //     type: 'link',
+ * //     content: 'Example',
+ * //     href: 'https://example.com',
+ * //     parts: [{ type: 'text', content: 'Example', bold: true }]
+ * //   }
  * // ]
  *
  * @example
@@ -77,14 +88,40 @@ export function parseStyledString(inputString) {
                 result.push(createTextPart(plainText, styles))
             }
 
-            // Handle <a> tags as links
+            // Handle <a> tags as links.
+            //
+            // Marks compose with a link from both directions and both used to
+            // be lost here, because this branch returned without consulting
+            // the accumulated styles OR walking the body:
+            //
+            //   <strong><a href=…>x</a></strong>   outer mark -> dropped
+            //   <a href=…><strong>x</strong></a>   inner mark -> survived as a
+            //                                      LITERAL '<strong>x</strong>'
+            //                                      string, which React escapes
+            //                                      and Word then shows as
+            //                                      visible tag text.
+            //
+            // Parsing the body with the accumulated styles fixes both: an
+            // outer mark rides in via `styles`, an inner one is found by the
+            // recursion, and a link can now carry mixed runs (`x<sup>2</sup>`).
+            // `content` stays the flat plain-text label for callers that only
+            // want a string; `parts` carries the styled runs.
             if (tag === 'a' && attrs) {
                 const href = readAttr(attrs, 'href')
                 if (href) {
+                    // Text runs only. A link wrapping a non-text atom (inline
+                    // math) is exotic, and neither builder can place one inside
+                    // an <a> today; dropping it yields a clean text label
+                    // rather than the raw markup that used to leak through.
+                    const parts = processSegments(innerText, styles).filter(
+                        (p) => p.type === 'text',
+                    )
+
                     result.push({
                         type: 'link',
-                        content: innerText,
+                        content: parts.map((p) => p.content).join(''),
                         href,
+                        parts,
                     })
                     lastIndex = offset + match.length
                     return

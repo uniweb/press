@@ -26,9 +26,22 @@ function Heading({ level, data, children, ...props }) {
                             data-link={part.href}
                             href={part.href}
                         >
-                            <span data-type="text" data-style="Hyperlink">
-                                {part.content}
-                            </span>
+                            {(part.parts?.length
+                                ? part.parts
+                                : [{ content: part.content }]
+                            ).map((run, j) => (
+                                <TextRun
+                                    key={j}
+                                    style="Hyperlink"
+                                    bold={run.bold}
+                                    italics={run.italics}
+                                    underline={!!run.underline}
+                                    subscript={run.subscript}
+                                    superscript={run.superscript}
+                                >
+                                    {run.content}
+                                </TextRun>
+                            ))}
                         </a>
                     ) : (
                         <TextRun

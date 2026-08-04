@@ -83,6 +83,31 @@ describe('Paragraph', () => {
         expect(link).toBeTruthy()
         expect(link.href).toBe('https://example.com')
     })
+
+    // parseStyledString is shared with the docx builders, so this lane carried
+    // the same defect: a mark inside a link reached the IR as a literal
+    // '<strong>…</strong>' string, and a mark wrapping one was dropped.
+    it('carries a mark inside a link into the link, not as raw markup', () => {
+        const { ir } = renderToIR(
+            <Paragraph data='A <a href="https://e.com"><strong>bold</strong></a> link' />,
+        )
+        const link = ir[0].children.find((c) => c.type === 'link')
+        const run = (link.children || []).find((c) => c.type === 'text')
+
+        expect(run.content).toBe('bold')
+        expect(run.bold).toBe('true')
+    })
+
+    it('applies a mark wrapping a link to its label', () => {
+        const { ir } = renderToIR(
+            <Paragraph data='A <em><a href="https://e.com">cited work</a></em> here' />,
+        )
+        const link = ir[0].children.find((c) => c.type === 'link')
+        const run = (link.children || []).find((c) => c.type === 'text')
+
+        expect(run.content).toBe('cited work')
+        expect(run.italics).toBe('true')
+    })
 })
 
 describe('Paragraphs', () => {

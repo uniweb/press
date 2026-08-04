@@ -82,4 +82,55 @@ describe('parseStyledString', () => {
         expect(result[3]).toEqual({ type: 'text', content: 'italic', italics: true })
         expect(result[4]).toEqual({ type: 'text', content: ' end' })
     })
+
+    // A link's label is styled runs, not a string. Marks compose with an <a>
+    // from both directions and both used to be lost: an outer mark was
+    // dropped, and an inner one survived as a literal '<strong>…</strong>'
+    // that Word then displayed as visible tag text.
+    describe('links carry marks', () => {
+        it('parses a plain link, exposing its label as a single run', () => {
+            const result = parseStyledString('See <a href="https://e.com">the docs</a>.')
+            expect(result).toEqual([
+                { type: 'text', content: 'See ' },
+                {
+                    type: 'link',
+                    content: 'the docs',
+                    href: 'https://e.com',
+                    parts: [{ type: 'text', content: 'the docs' }],
+                },
+                { type: 'text', content: '.' },
+            ])
+        })
+
+        it('applies a mark wrapping the link to its label', () => {
+            const result = parseStyledString('See<sup><a href="https://e.com">1</a></sup>')
+            expect(result[1]).toEqual({
+                type: 'link',
+                content: '1',
+                href: 'https://e.com',
+                parts: [{ type: 'text', content: '1', superscript: true }],
+            })
+        })
+
+        it('parses a mark inside the link rather than leaving raw markup', () => {
+            const result = parseStyledString('<a href="https://e.com"><strong>bold</strong></a>')
+            expect(result).toEqual([
+                {
+                    type: 'link',
+                    content: 'bold',
+                    href: 'https://e.com',
+                    parts: [{ type: 'text', content: 'bold', bold: true }],
+                },
+            ])
+        })
+
+        it('splits a link label into runs when only part of it is marked', () => {
+            const result = parseStyledString('<a href="https://e.com">x<sup>2</sup></a>')
+            expect(result[0].content).toBe('x2')
+            expect(result[0].parts).toEqual([
+                { type: 'text', content: 'x' },
+                { type: 'text', content: '2', superscript: true },
+            ])
+        })
+    })
 })
