@@ -84,9 +84,13 @@ describe('attributeMap', () => {
         //   + 1 data-bookmark              (#4 — paragraph bookmark targets
         //                                   for in-document TOC navigation)
         //   + 2 data-spacing-line{,-rule}  (#5 — per-paragraph line spacing)
-        //   = 85 total.
+        //   = 85.
+        //
+        // Subscript / superscript run formatting:
+        //   + 2 data-{subscript,superscript}
+        //   = 87 total.
         const keys = Object.keys(attributeMap)
-        expect(keys).toHaveLength(85)
+        expect(keys).toHaveLength(87)
     })
 
     it('does not contain data-type', () => {

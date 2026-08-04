@@ -43,6 +43,8 @@ function coerceDateChildren(children) {
  *
  * @param {Object} props
  * @param {boolean} [props.bold]
+ * @param {boolean} [props.subscript] - Render below the baseline (docx vertAlign).
+ * @param {boolean} [props.superscript] - Render above the baseline (docx vertAlign).
  * @param {boolean} [props.italics]
  * @param {boolean} [props.underline]
  * @param {string} [props.color] - Hex color (with or without '#') or a
@@ -67,6 +69,8 @@ export default function TextRun({
     smallCaps,
     allCaps,
     strike,
+    subscript,
+    superscript,
     style,
     role,
     ...props
@@ -88,6 +92,8 @@ export default function TextRun({
     if (smallCaps) dataProps['data-smallcaps'] = 'true'
     if (allCaps) dataProps['data-allcaps'] = 'true'
     if (strike) dataProps['data-strike'] = 'true'
+    if (subscript) dataProps['data-subscript'] = 'true'
+    if (superscript) dataProps['data-superscript'] = 'true'
     if (resolvedStyle) dataProps['data-style'] = resolvedStyle
 
     return (

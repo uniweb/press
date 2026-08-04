@@ -31,6 +31,22 @@ describe('parseStyledString', () => {
         ])
     })
 
+    it('parses subscript text', () => {
+        const result = parseStyledString('CO<sub>2</sub>')
+        expect(result).toEqual([
+            { type: 'text', content: 'CO' },
+            { type: 'text', content: '2', subscript: true },
+        ])
+    })
+
+    it('parses superscript text', () => {
+        const result = parseStyledString('x<sup>2</sup>')
+        expect(result).toEqual([
+            { type: 'text', content: 'x' },
+            { type: 'text', content: '2', superscript: true },
+        ])
+    })
+
     it('parses nested marks', () => {
         const result = parseStyledString('<strong><em>Bold Italic</em></strong>')
         expect(result).toEqual([

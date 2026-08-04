@@ -187,6 +187,8 @@ export const attributeMap = {
     'data-smallcaps': { path: ['smallCaps'], transform: asTrue },
     'data-allcaps': { path: ['allCaps'], transform: asTrue },
     'data-strike': { path: ['strike'], transform: asTrue },
+    'data-subscript': { path: ['subScript'], transform: asTrue },
+    'data-superscript': { path: ['superScript'], transform: asTrue },
 
     // Row-level: whether the row repeats as a header on each new page
     // when the table breaks. Presence-only — any truthy value counts.

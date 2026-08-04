@@ -33,4 +33,22 @@ describe('Stage 3: TextRun caps / strike', () => {
         )
         expect(documentXml).toMatch(/<w:strike\b/)
     })
+
+    it('emits <w:vertAlign w:val="subscript"/> for subscript', async () => {
+        const { documentXml } = await compileInvoice(
+            <Paragraph>
+                <TextRun subscript>2</TextRun>
+            </Paragraph>,
+        )
+        expect(documentXml).toMatch(/<w:vertAlign w:val="subscript"\/>/)
+    })
+
+    it('emits <w:vertAlign w:val="superscript"/> for superscript', async () => {
+        const { documentXml } = await compileInvoice(
+            <Paragraph>
+                <TextRun superscript>2</TextRun>
+            </Paragraph>,
+        )
+        expect(documentXml).toMatch(/<w:vertAlign w:val="superscript"\/>/)
+    })
 })

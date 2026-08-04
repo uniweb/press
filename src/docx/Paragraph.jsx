@@ -103,6 +103,8 @@ export default function Paragraph({
                             bold={part.bold}
                             italics={part.italics}
                             underline={!!part.underline}
+                            subscript={part.subscript}
+                            superscript={part.superscript}
                         >
                             {part.content}
                         </TextRun>

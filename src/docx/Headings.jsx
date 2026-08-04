@@ -36,6 +36,8 @@ function Heading({ level, data, children, ...props }) {
                             bold={part.bold}
                             italics={part.italics}
                             underline={!!part.underline}
+                            subscript={part.subscript}
+                            superscript={part.superscript}
                         >
                             {part.content}
                         </TextRun>

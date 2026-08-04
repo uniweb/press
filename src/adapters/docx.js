@@ -609,6 +609,10 @@ function irToTextRunPair(node) {
     if (node.smallCaps === 'true' || node.smallCaps === true) options.smallCaps = true
     if (node.allCaps === 'true' || node.allCaps === true) options.allCaps = true
     if (node.strike === 'true' || node.strike === true) options.strike = true
+    // Subscript / superscript — mutually exclusive vertical alignment.
+    if (node.subScript === 'true' || node.subScript === true) options.subScript = true
+    else if (node.superScript === 'true' || node.superScript === true)
+        options.superScript = true
 
     result.push(new TextRun(options))
     return result

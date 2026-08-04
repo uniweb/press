@@ -118,6 +118,8 @@ export function parseStyledString(inputString) {
             if (tag === 'strong' || tag === 'b') newStyles.bold = true
             if (tag === 'em' || tag === 'i') newStyles.italics = true
             if (tag === 'u') newStyles.underline = {}
+            if (tag === 'sub') newStyles.subscript = true
+            if (tag === 'sup') newStyles.superscript = true
 
             result = result.concat(processSegments(innerText, newStyles))
             lastIndex = offset + match.length
