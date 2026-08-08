@@ -478,7 +478,13 @@ describe('compileEpub — metadata', () => {
         const css = await zip.file('OEBPS/styles.css').async('string')
         expect(css).toContain('tml-jot')
         expect(css).toContain('.special { color: red; }')
-        expect(css.indexOf('tml-jot')).toBeLessThan(css.indexOf('.special'))
+        // Compare against the WHOLE fixture rule, not the `.special` prefix.
+        // MATH_CSS now vendors Temml's stylesheet, which carries a
+        // `.special-fraction` rule of its own -- so `indexOf('.special')` found
+        // a match inside the math layer and this assertion inverted while the
+        // ordering it checks was still correct (the endsWith test above proves
+        // the design sheet is last).
+        expect(css.indexOf('tml-jot')).toBeLessThan(css.indexOf('.special { color: red; }'))
     })
 })
 
