@@ -107,6 +107,23 @@ function renderElement(element, key) {
                 />
             )
 
+        case 'document':
+            // A file, not a picture. In print it can only be shown, not opened:
+            // its preview when it has one, captioned with its name — and
+            // nothing when it has none, as a video is skipped. Until 2026-09-29
+            // the parser delivered a document as an image, and this printed
+            // the file itself as one.
+            if (!element.attrs?.preview) return null
+            return (
+                <Image
+                    key={key}
+                    src={element.attrs.preview}
+                    alt=""
+                    caption={element.attrs.caption || element.attrs.alt}
+                    id={element.attrs.id || undefined}
+                />
+            )
+
         // Skipped: dataBlock (not prose), video (not in print), inset (Phase 3).
         default:
             return null

@@ -275,6 +275,29 @@ describe('Sequence', () => {
         expect(types).toEqual(['heading', 'paragraph', 'codeBlock', 'list'])
     })
 
+    it('prints a document as its preview, captioned with its name — never the file as an image', () => {
+        const sequence = [
+            {
+                type: 'document',
+                attrs: { url: '/r/report.pdf', alt: 'Annual report', role: 'pdf', preview: '/r/cover.jpg' },
+            },
+        ]
+        const { html, ir } = renderToIR(<Sequence data={sequence} />)
+        expect(ir.map((n) => n.type)).toEqual(['image'])
+        expect(html).toContain('/r/cover.jpg')
+        expect(html).toContain('Annual report')
+        expect(html).not.toContain('/r/report.pdf')
+    })
+
+    it('skips a document with no preview — in print it has nothing to show', () => {
+        const sequence = [
+            { type: 'paragraph', text: 'Before.' },
+            { type: 'document', attrs: { url: '/r/report.pdf', alt: 'Annual report', role: 'pdf' } },
+        ]
+        const { ir } = renderToIR(<Sequence data={sequence} />)
+        expect(ir.map((n) => n.type)).toEqual(['paragraph'])
+    })
+
     it('returns null for empty or missing data', () => {
         const { ir: empty } = renderToIR(<Sequence data={[]} />)
         const { ir: missing } = renderToIR(<Sequence data={null} />)
