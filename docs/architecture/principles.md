@@ -88,4 +88,4 @@ These are durable, not immutable. New formats will reveal gaps the current set d
 - Prefer adding a principle to modifying one. Existing commitments have ripple effects throughout Press, and softening them without cause produces drift.
 - When removing or materially changing a principle, explicitly identify the existing design decisions in Press that rest on the old version, so the amendment is made with full awareness of its consequences.
 
-Individual format roadmaps, library choices, and implementation plans live under `docs/architecture/format-roadmap.md` and sibling design docs. Principles live here.
+Individual format roadmaps, library choices, and implementation plans live under `docs/design/format-roadmap.md` and sibling design docs. Principles live here.

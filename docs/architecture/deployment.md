@@ -135,5 +135,5 @@ A future `@uniweb/press-compile-server` package is the likely shape when this ch
 
 - [principles.md](./principles.md) — particularly principle 3 on frontend-first.
 - [overview.md](./overview.md) — the broader architecture these endpoints slot into.
-- [format-roadmap.md](./format-roadmap.md) — which formats currently need a backend, which don't, and which haven't decided.
+- [format-roadmap.md](../design/format-roadmap.md) — which formats currently need a backend, which don't, and which haven't decided.
 - [adding-a-format.md](./adding-a-format.md) — the adapter side of this story.

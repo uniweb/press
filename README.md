@@ -87,13 +87,16 @@ For a fuller walkthrough, see the [quick start](./docs/quick-start.md).
 
 ## What's shipped
 
-Press ships three format adapters today:
+Press ships six format adapters today:
 
 - **docx** — Word documents via the [`docx`](https://docx.js.org) library. Paragraphs, headings, text runs, tables, lists, images, hyperlinks, headers/footers, page numbering. The flagship format.
 - **typst** — Typeset PDFs via the [Typst](https://typst.app) compiler. Same-source preview from `/typst` builders; whole-book compile via `compileSubtree`; `sources` mode (pure frontend, user compiles locally) and `server` mode (via a companion endpoint — see [deployment.md](./docs/architecture/deployment.md)).
 - **xlsx** — Spreadsheets via `exceljs`. Plain `{ title, headers, data }` objects, multi-sheet, preview and compiled output independent (because spreadsheets aren't typography).
+- **latex** — A LaTeX source bundle (`main.tex` and its parts, zipped) that you compile with `latexmk` or another TeX engine. Its builders at `/latex` are the `/typst` builders, so the same JSX can be registered for both.
+- **pagedjs** — Browser-paginated HTML: [Paged.js](https://pagedjs.org) lays out the pages in a browser tab, and the reader prints to PDF. It reads the fragments a foundation registers under `'html'`.
+- **epub** — Reflowable EPUB3 e-books, from the same `'html'` registrations as pagedjs.
 
-For what's next (Paged.js for browser-paginated PDFs, EPUB, slides, and a handful of speculative formats) see the [format roadmap](./docs/architecture/format-roadmap.md). For writing a custom adapter against an unsupported format, see the [custom adapter guide](./docs/guides/custom-adapter.md).
+For what's next, see the [format roadmap](./docs/design/format-roadmap.md). For writing a custom adapter against an unsupported format, see the [custom adapter guide](./docs/guides/custom-adapter.md).
 
 ## Three ways to use Press
 
@@ -152,7 +155,7 @@ Format adapters themselves (`compileDocx`, `compileTypst`, `compileXlsx`, and th
 - [Overview](./docs/architecture/overview.md) — how Press is put together under the hood, for contributors orienting to the codebase.
 - [Adding a format](./docs/architecture/adding-a-format.md) — worked examples (LaTeX, Paged.js) and the general checklist.
 - [Deployment](./docs/architecture/deployment.md) — wire protocol, reference implementations, and operational concerns for formats that need a backend.
-- [Format roadmap](./docs/architecture/format-roadmap.md) — what's shipped, what's next, what's speculative.
+- [Format roadmap](./docs/design/format-roadmap.md) — what's shipped, what's next, what's speculative.
 
 **Runnable example:**
 

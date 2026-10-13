@@ -224,18 +224,19 @@ The same separation lets Press serve callers other than the in-page Download but
 
 ## Lazy-loaded adapters
 
-The `docx` library is ~3.4 MB unminified — a significant cost to pay for users who never click Download. Press never pulls it into the main bundle. The format adapter at `src/adapters/docx.js` is reached *only* through a dynamic import inside `useDocumentCompile`:
+The `docx` library is ~3.4 MB unminified — a significant cost to pay for users who never click Download. Press never pulls it into the main bundle. The format adapter at `src/adapters/docx.js` is reached *only* through a dynamic import in the adapter table, `src/adapters/dispatch.js`, which both `useDocumentCompile` and `compileSubtree` compile through:
 
 ```js
 const ADAPTERS = {
-    docx: () => import('./adapters/docx.js'),
-    // xlsx: () => import('./adapters/xlsx.js'),
+    docx: { load: () => import('./docx.js'), consumes: 'docx', ir: true },
+    xlsx: { load: () => import('./xlsx.js'), consumes: 'xlsx', ir: false },
+    // …one entry per format
 }
 ```
 
 The first time `compile('docx')` runs, the bundler emits a separate chunk for the adapter and the browser fetches it on demand. Until then, a page using Press pays only for the registration machinery (small, mostly React context) and whatever builder components you've imported (also small — plain JSX wrappers around `data-*` attributes, with no dependency on the `docx` library).
 
-The adapter path is deliberately *not* listed in `package.json`'s `exports` field. Consumers can't reach for it directly, which keeps the lazy-load contract enforceable. When Press eventually ships xlsx and pdf toolkits, they will follow the same pattern: a public `/xlsx` or `/pdf` subpath for React builders (small), plus an internal adapter reached via dynamic import (large).
+The adapter path is deliberately *not* listed in `package.json`'s `exports` field. Consumers can't reach for it directly, which keeps the lazy-load contract enforceable. Every shipped format follows the same pattern: React builders, where the format has them, at a public subpath (`/docx`, `/typst`, `/latex`) — small — plus an internal adapter reached via dynamic import — large.
 
 Custom adapters written by users of Press can follow the same convention or not — the lazy-load story is a Press-internal contract about how *shipped* adapters stay out of the main bundle. If your custom format's dependencies are small, static imports are fine.
 

@@ -1,6 +1,6 @@
 # Adding a format to Press
 
-This doc is for contributors writing a new format adapter. It assumes you have read [principles.md](./principles.md) and [overview.md](./overview.md) — the commitments and the current architecture, respectively. For what's currently shipped and what's next in the pipeline, see [format-roadmap.md](./format-roadmap.md).
+This doc is for contributors writing a new format adapter. It assumes you have read [principles.md](./principles.md) and [overview.md](./overview.md) — the commitments and the current architecture, respectively. For what's currently shipped and what's next in the pipeline, see [format-roadmap.md](../design/format-roadmap.md).
 
 A Press adapter is a single module at `src/adapters/<format>.js` exporting one `compile<Format>(compiledInput, documentOptions) → Promise<Blob>` function, plus (usually) a set of React builder components at `src/<format>/` that section authors use to register fragments. Everything else is either reused from core or specific to the format.
 
@@ -56,8 +56,10 @@ Once the shape is chosen, the work looks like this. Every step is required; most
    ```
    Three fields:
    - `load` — dynamic-imported adapter module. This is the only place in Press that references the adapter directly; the `import()` is what keeps it out of the main bundle ([principle 2](./principles.md#2-adapters-are-dynamic-imported)).
-   - `consumes` — the store key foundations register fragments under. May differ from the output format name when multiple formats share an input shape (e.g. pagedjs and future EPUB both declare `consumes: 'html'`; foundations register once under `'html'` and both adapters read it). Defaults to the format name when omitted — use that when the format has no shape-siblings.
+   - `consumes` — the store key foundations register fragments under. May differ from the output format name when multiple formats share an input shape (e.g. pagedjs and epub both declare `consumes: 'html'`; foundations register once under `'html'` and both adapters read it). Defaults to the format name when omitted — use that when the format has no shape-siblings.
    - `ir` — `true` for adapters that walk each fragment into the IR tree (docx, typst); `false` for passthrough adapters that take HTML strings (pagedjs) or plain data objects (xlsx).
+
+   Then add `adapter.compile<Format>` to the lookup in `runCompile`, in the same file. It names each adapter's compile function explicitly, so without that line a compile loads your module and throws *"does not export a compile function"*.
 
 4. **Don't touch `compileOutputs` in `src/ir/compile.js`** unless the format introduces a genuinely new input-shape family. The dispatch is table-driven off the descriptor's `(consumes, ir)` — IR-walk, HTML-passthrough, and data-passthrough are already covered. Adding a fourth branch only makes sense if the format is a new *kind* of thing (e.g. a streaming output, a pre-chunked input) — and at that point it's worth a design doc before coding.
 
@@ -125,5 +127,5 @@ The promote-on-second-use rule is load-bearing. If you find yourself wanting to 
 
 - [principles.md](./principles.md) — the commitments this doc operationalizes.
 - [overview.md](./overview.md) — the broader architecture your adapter slots into.
-- [format-roadmap.md](./format-roadmap.md) — what's shipped, what's likely next.
+- [format-roadmap.md](../design/format-roadmap.md) — what's shipped, what's likely next.
 - [deployment.md](./deployment.md) — if your format needs a backend, the wire protocol and reference implementations live here.

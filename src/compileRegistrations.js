@@ -13,8 +13,8 @@
  * Intended consumers:
  *   - Whole-book Download buttons (foundation aggregates every page's
  *     blocks into a single tree, passes it here).
- *   - Build-time compile (uniweb build --book): same aggregation run at
- *     build time rather than on click.
+ *   - Headless hosts that compile a whole site with no browser (unipress):
+ *     `compileDocument` gathers the blocks and comes through here.
  *   - Headless export pipelines (Mode 4 from the Press concepts doc).
  *
  * This function is sync in, async out — renderToStaticMarkup is sync,
@@ -51,9 +51,13 @@ import { runCompile, getAdapterDescriptor } from './adapters/dispatch.js'
  *     'typst',
  *     { basePath: website.basePath },
  *   )
- *   // hand `compiled` to the typst adapter:
- *   const { compileTypst } = await import('@uniweb/press/adapters/typst')
- *   const blob = await compileTypst(compiled, { mode: 'sources', ... })
+ *   // `compiled` is the input the typst adapter reads. The adapters are not
+ *   // exported (they stay lazy-loaded), so for the Blob call compileSubtree,
+ *   // which runs this step and the adapter:
+ *   const blob = await compileSubtree(<ChildBlocks blocks={blocks} />, 'typst', {
+ *     basePath: website.basePath,
+ *     adapterOptions: { mode: 'sources' },
+ *   })
  */
 export function compileRegistrations(elements, format, options = {}) {
     const { basePath, theme } = options

@@ -7,7 +7,7 @@
  *
  *   consumes — the store key whose fragments feed this adapter.
  *              Foundations register under this key. Multiple adapters can
- *              share the same key (e.g. pagedjs and future EPUB both read
+ *              share the same key (e.g. pagedjs and EPUB both read
  *              'html'), so a foundation writes one registration and gets
  *              both formats.
  *   ir       — whether fragments are walked to IR (true: docx/typst) or

@@ -18,7 +18,7 @@
  *   consumes — the store key foundations register fragments under. May
  *              differ from the output format name. Paged.js compiles
  *              'pagedjs' output but reads fragments registered under
- *              'html'; future EPUB will do the same. (See principle 6's
+ *              'html'; EPUB does the same. (See principle 6's
  *              "When the generalization is already earned" carve-out in
  *              docs/architecture/principles.md — this split was introduced
  *              with the first HTML-string adapter rather than deferred.)

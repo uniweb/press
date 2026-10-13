@@ -26,7 +26,7 @@ import { runCompile, getAdapterDescriptor } from './adapters/dispatch.js'
 // useDocumentCompile call in a page. Same behaviour as the off-screen
 // compileSubtree pathway — keyed on the adapter's `consumes` input shape,
 // not the output format, so a missed 'html' registration warns once total
-// even across multiple output formats (pagedjs + future epub) that share it.
+// even across multiple output formats (pagedjs + epub) that share it.
 const _emptyKeyWarned = new Set()
 function warnIfEmptyRegistrations(store, format) {
     const desc = getAdapterDescriptor(format)

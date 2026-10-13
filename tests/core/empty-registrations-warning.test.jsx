@@ -8,7 +8,7 @@
  * PDF empty" time.
  *
  * The warning is one-time per input-shape key per page (not per format),
- * so alias'd formats (pagedjs + future epub both consume 'html') don't
+ * so alias'd formats (pagedjs + epub both consume 'html') don't
  * double-warn for the same missed registration.
  *
  * Each test resets the module graph via vi.resetModules so the private

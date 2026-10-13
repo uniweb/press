@@ -10,7 +10,7 @@ Read the relevant doc for the task before touching code. Do not rely on memory; 
 - **`docs/architecture/overview.md`** — the map. How Press is actually put together: registration store, per-format fragment shapes, compile dispatch, adapter boundary. Consult when orienting to an unfamiliar area.
 - **`docs/architecture/adding-a-format.md`** — worked examples and checklist for writing a new adapter. Replaces the old ad-hoc procedural notes that used to live here.
 - **`docs/architecture/deployment.md`** — wire protocol, reference implementations, font story for formats that need a backend. Rarely needed unless working on server-mode code.
-- **`docs/architecture/format-roadmap.md`** — what's shipped, what's next. Check before proposing format work to make sure the plan isn't already resolved.
+- **`docs/design/format-roadmap.md`** — what's shipped, what's next. Check before proposing format work to make sure the plan isn't already resolved.
 - **`docs/architecture/word-styles-decision.md`** — why typography routes through OOXML named styles instead of inline formatting. Consult before changing anything in the Stage 6 typography surface.
 - **`docs/concepts.md`** — user-facing mental model. Useful when writing guides or examples.
 - **`docs/guides/docx-foundation-cookbook.md`** — task-oriented walkthrough for foundation authors. The single best document to point a colleague at when they're building a docx-producing foundation. If you're answering a foundation-author question, the answer is probably already in here — quote and link rather than re-deriving.
@@ -26,15 +26,20 @@ Like `@uniweb/kit`, this package ships **raw source files** — no bundler, no `
 
 ## Source layout
 
+The tree names the parts this file talks about; it is not a full listing (`ls -R src` is).
+
 ```
 src/
-├── index.js                     ← root barrel: DocumentProvider,
+├── index.js                     ← root barrel: DocumentProvider, createStore,
 │                                    useDocumentOutput, useDocumentCompile,
-│                                    triggerDownload
+│                                    triggerDownload, compileRegistrations,
+│                                    compileSubtree, compileDocument
 ├── DocumentProvider.jsx
 ├── DocumentContext.js
 ├── useDocumentOutput.js
-├── useDocumentCompile.js        ← hook; dynamic-imports ./adapters/*.js
+├── useDocumentCompile.js        ← hook; compiles through adapters/dispatch.js
+├── compileRegistrations.js      ← off-screen compile: compileRegistrations,
+│                                    compileSubtree, compileDocument
 ├── triggerDownload.js           ← DOM utility
 │
 ├── docx/                        ← PUBLIC /docx — React builder components
@@ -47,10 +52,16 @@ src/
 │   ├── List.jsx
 │   ├── LinkPart.jsx             ← INTERNAL — renders a parsed `link` part
 │   │                              (NOT Link.jsx: different contract)
+│   ├── classifyHref.js          ← INTERNAL — anchor vs destination
 │   └── parseStyledString.js     ← INTERNAL helper (not in barrel)
 │
 ├── typst/                       ← PUBLIC /typst — React builder components
+│   ├── Sequence.jsx             ← walks content.sequence into builders
 │   └── LinkPart.jsx             ← INTERNAL — this lane's copy (see below)
+│
+├── latex/                       ← PUBLIC /latex — the typst builders, re-exported,
+│                                    plus raw-LaTeX and cite/autoref helpers
+├── format/                      ← PUBLIC /format — locale-aware text formatters
 │
 ├── sections/                    ← PUBLIC /sections — higher-level templates
 │   ├── index.js
@@ -58,9 +69,14 @@ src/
 │   └── StandardSection.jsx
 │
 ├── adapters/                    ← INTERNAL — not in package.json exports
+│   ├── dispatch.js              ← the ADAPTERS table and runCompile — the only
+│   │                              place an adapter is imported
 │   ├── docx.js                  ← compileDocx, buildDocument, docx library
+│   ├── xlsx.js
 │   ├── typst.js
-│   └── xlsx.js
+│   ├── latex.js
+│   ├── pagedjs.js               ← reads fragments registered under 'html'
+│   └── epub.js                  ← reads fragments registered under 'html'
 │
 └── ir/                          ← PUBLIC /ir — IR layer for custom adapters
     ├── index.js
@@ -161,7 +177,7 @@ Adapters declare a `consumes` key in the `ADAPTERS` descriptor (`src/adapters/di
 - `typst` consumes `'typst'` (self-aliased — most common case)
 - `docx`  consumes `'docx'` (same)
 - `xlsx`  consumes `'xlsx'` (same)
-- `pagedjs` consumes **`'html'`** — foundations register under `'html'`, not `'pagedjs'`. A future EPUB adapter will also consume `'html'`, so the foundation writes one registration and both adapters read it.
+- `pagedjs` consumes **`'html'`** — foundations register under `'html'`, not `'pagedjs'`. The `epub` adapter consumes `'html'` too, so the foundation writes one registration and both adapters read it.
 
 When an adapter produces a valid-looking shell — doctype, metadata, stylesheet, all the right tags — with an empty body, the cause is almost always that foundation sections never called `useDocumentOutput(block, <consumes-key>, …)`. Check the descriptor's `consumes` value, not the output format name.
 
@@ -217,7 +233,7 @@ Tests use `@testing-library/react` with the `jsdom` Vitest environment. The comp
 See `docs/architecture/adding-a-format.md` for the checklist, worked examples (LaTeX, Paged.js), and the three canonical adapter shapes. The short version:
 
 1. Create `src/adapters/<format>.js` exporting `compile<Format>(compiledInput, options) → Promise<Blob>`.
-2. Add a loader to the `ADAPTERS` map in `src/useDocumentCompile.js`: `<format>: () => import('./adapters/<format>.js')`.
+2. Add a descriptor to the `ADAPTERS` map in `src/adapters/dispatch.js`: `<format>: { load: () => import('./<format>.js'), consumes: '<input-key>', ir: <bool> }`, and add `adapter.compile<Format>` to the lookup in `runCompile` in the same file — without it, a compile finds the module and throws *"does not export a compile function"*.
 3. Do **not** add the adapter to `package.json`'s `exports` — it must remain internal so the library dependency stays dynamic-only.
 4. If the format needs React primitives, put those at `src/<format>/` and add a `./<format>` subpath in the `exports` field, mirroring the docx layout.
 
@@ -231,4 +247,4 @@ See `docs/architecture/adding-a-format.md` for the checklist, worked examples (L
 
 Publishing is centralized at the workspace root via `pnpm framework:publish:*` (see root `CLAUDE.md`). The script auto-detects what needs publishing and cascades dependents. Do not run a per-package publish command from here. Press is live on npm (`@uniweb/press`); subsequent releases go through the same centralized pipeline.
 
-The public surface is still pre-1.0, so breaking changes are acceptable when justified — but each release is a published artifact. Bump versions through the workspace publish script, and keep the `exports` field and documented subpaths coherent.
+Press is on 1.x. A breaking change is still acceptable when justified, and it ships as a minor version: mark its commit with `!` (`feat!:`, `refactor!:`), which is what the publish script reads to choose the bump. Never edit `version` by hand. Each release is a published artifact, so keep the `exports` field and documented subpaths coherent.

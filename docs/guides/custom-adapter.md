@@ -164,7 +164,7 @@ function MarkdownControls() {
 }
 ```
 
-`DocumentContext` is not in Press's public exports — this is the one place where an application-level custom adapter has to reach a little deeper. The simplest workaround is a tiny component that subscribes with `useContext(DocumentContext)` imported directly from Press's source. A cleaner approach (and the one contributing a built-in adapter would take) is to add an entry to the `ADAPTERS` map in `src/useDocumentCompile.js` — see the "adding a format adapter" runbook in [`CLAUDE.md`](../../CLAUDE.md).
+`DocumentContext` is not in Press's public exports — this is the one place where an application-level custom adapter has to reach a little deeper. The simplest workaround is a tiny component that subscribes with `useContext(DocumentContext)` imported directly from Press's source. A cleaner approach (and the one contributing a built-in adapter would take) is to add an entry to the `ADAPTERS` map in `src/adapters/dispatch.js` — see the "adding a format adapter" runbook in [`CLAUDE.md`](../../CLAUDE.md).
 
 ### Registering under a custom format
 

@@ -2,7 +2,7 @@
 
 This is a contributor-oriented description of how Press is put together. It is the map — a walk through what exists and how the pieces fit.
 
-For the *commitments* that shape these pieces, read [principles.md](./principles.md) first. For what it takes to add a new format, see [adding-a-format.md](./adding-a-format.md). For deploying a compile endpoint in production, see [deployment.md](./deployment.md). For the near-term format roadmap, see [format-roadmap.md](./format-roadmap.md).
+For the *commitments* that shape these pieces, read [principles.md](./principles.md) first. For what it takes to add a new format, see [adding-a-format.md](./adding-a-format.md). For deploying a compile endpoint in production, see [deployment.md](./deployment.md). For the near-term format roadmap, see [format-roadmap.md](../design/format-roadmap.md).
 
 If you are *using* Press — wiring up a Download button, writing a section component that opts into a format — read the [Concepts](../concepts.md) doc and the guides first. This document is for people extending Press.
 
@@ -150,13 +150,13 @@ Useful for formats that aren't rendered documents — spreadsheets, machine-cons
 
 ### Adapter loading
 
-Adapters are reached only through the `ADAPTERS` map in `src/useDocumentCompile.js`, which uses dynamic `import()`. Bundlers emit each adapter as a separate chunk and fetch it on first compile. The adapters directory is **not** in `package.json`'s `exports` field — the only entry points a foundation can import from are the format-agnostic core, the builder subpaths (`/docx`, `/typst`), the section helpers, and the IR utilities. If an adapter ends up in the main bundle via a stray static import, that's a principle-2 violation and a release blocker.
+Adapters are reached only through the `ADAPTERS` map in `src/adapters/dispatch.js`, whose entries load each adapter with a dynamic `import()`; `useDocumentCompile` and `compileSubtree` both compile through it. Bundlers emit each adapter as a separate chunk and fetch it on first compile. The adapters directory is **not** in `package.json`'s `exports` field — the only entry points a foundation can import from are the format-agnostic core, the builder subpaths (`/docx`, `/typst`), the section helpers, and the IR utilities. If an adapter ends up in the main bundle via a stray static import, that's a principle-2 violation and a release blocker.
 
 ## See also
 
 - [principles.md](./principles.md) — the architectural commitments Press is built on.
 - [adding-a-format.md](./adding-a-format.md) — worked examples (LaTeX, Paged.js) plus the general checklist for a new adapter.
 - [deployment.md](./deployment.md) — wire protocol, reference implementations, fonts, and operational concerns for formats that need a backend.
-- [format-roadmap.md](./format-roadmap.md) — what's shipped, what's next, and what's unlikely.
+- [format-roadmap.md](../design/format-roadmap.md) — what's shipped, what's next, and what's unlikely.
 - [Concepts](../concepts.md) — user-facing mental model: preview strategies, fragment shapes, and the four ways to combine preview and registration.
 - [Publishing a book](../guides/book-publishing.md) — how the book pipeline is set up end to end.

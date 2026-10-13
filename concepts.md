@@ -1,6 +1,6 @@
 # Press concepts
 
-A mental model for using Press. If you're writing a Uniweb foundation and want to understand how to think about downloadable output, this is the doc. It's about ideas, not API — for the hello-world walkthrough see the [quick start](./quick-start.md); for the commitments that shape Press's design see [principles.md](./architecture/principles.md).
+A mental model for using Press. If you're writing a Uniweb foundation and want to understand how to think about downloadable output, this is the doc. It's about ideas, not API — for the hello-world walkthrough see the [quick start](./docs/quick-start.md); for the commitments that shape Press's design see [principles.md](./docs/architecture/principles.md).
 
 ## The problem Press solves
 
@@ -84,7 +84,7 @@ Nothing prevents using both. A common pattern for foundations that care about bo
 - Normal reading uses same-source preview (what the user sees while browsing).
 - A "preview compiled file" button opens a modal with the docx-preview iframe as a cross-check view.
 
-The [preview-iframe example](../examples/preview-iframe/) in the repo demonstrates the compiled-blob pattern end to end.
+The [preview-iframe example](./examples/preview-iframe/) in the repo demonstrates the compiled-blob pattern end to end.
 
 ## How you use Press
 
@@ -116,7 +116,7 @@ Books are different. A book has one URL per chapter, one chapter per render, and
 
 Press's answer is `compileSubtree`. You hand it a React subtree — typically `<ChildBlocks blocks={website.allBlocks} />` which pulls every block from every page — and it renders the subtree off-screen through its own provider, gathers all registrations, and compiles. No page routing, no DOM mounts. Uniweb's object graph is already populated in memory; walking it is free.
 
-This is the mechanism behind Typst book compilation, and it's how any future "whole-site export" format will work. For a full treatment, see the [book publishing guide](./guides/book-publishing.md).
+This is the mechanism behind Typst book compilation, and it's how any future "whole-site export" format will work. For a full treatment, see the [book publishing guide](./docs/guides/book-publishing.md).
 
 ## What Press doesn't do
 
@@ -128,13 +128,13 @@ Four things Press deliberately leaves to upstream or to the foundation:
 
 **Routing.** Pages, navigation, active-route highlighting — foundation and runtime concerns. `compileSubtree` works regardless of the active route; Press never interacts with the router.
 
-**Production server infrastructure.** Press ships a Vite dev plugin for local Typst compilation because it's a two-line install, but production deployment of a compile endpoint is the foundation's responsibility. The wire protocol is tiny and deployment is highly platform-specific. See [deployment.md](./architecture/deployment.md) if you're running a format that needs a backend.
+**Production server infrastructure.** Press ships a Vite dev plugin for local Typst compilation because it's a two-line install, but production deployment of a compile endpoint is the foundation's responsibility. The wire protocol is tiny and deployment is highly platform-specific. See [deployment.md](./docs/architecture/deployment.md) if you're running a format that needs a backend.
 
 ## See also
 
-- [Quick start](./quick-start.md) — ten minutes from install to a working Download button.
-- [Writing a custom adapter](./guides/custom-adapter.md) — build a new format that isn't one of the shipped ones.
-- [Publishing a book](./guides/book-publishing.md) — whole-site aggregation, the Typst pipeline, compile modes.
-- [The preview pattern](./guides/preview-pattern.md) — using `docx-preview` for compiled-blob preview.
-- [principles.md](./architecture/principles.md) — the commitments behind the design.
-- [overview.md](./architecture/overview.md) — how Press is put together under the hood.
+- [Quick start](./docs/quick-start.md) — ten minutes from install to a working Download button.
+- [Writing a custom adapter](./docs/guides/custom-adapter.md) — build a new format that isn't one of the shipped ones.
+- [Publishing a book](./docs/guides/book-publishing.md) — whole-site aggregation, the Typst pipeline, compile modes.
+- [The preview pattern](./docs/guides/preview-pattern.md) — using `docx-preview` for compiled-blob preview.
+- [principles.md](./docs/architecture/principles.md) — the commitments behind the design.
+- [overview.md](./docs/architecture/overview.md) — how Press is put together under the hood.
