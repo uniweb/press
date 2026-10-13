@@ -801,29 +801,25 @@ function toWidthType(v) {
 }
 
 /**
- * Build a TableCell `width` option from an IR width node.
+ * Build a TableCell (or Table) `width` option from an IR width node.
  *
  * OOXML ECMA-376 expects `w:w` to be in fiftieths of a percent when
- * `w:type="pct"` (so 50% = 2500). The docx library, when given a
- * number size with `WidthType.PERCENTAGE`, serialises it as `${n}%`
- * (e.g. `w:w="18%"`) which Word flags as a validation error and
- * auto-repairs on open. To get a plain-number output we multiply by
- * 50 and pass the value as a string — that takes the library's
- * universal-measure branch, which emits the value verbatim as a
- * plain integer while keeping `w:type="pct"`.
+ * `w:type="pct"` (so 50% = 2500). docx ≥ 9.9 writes a number size with
+ * `WidthType.PERCENTAGE` that way (50 → `w:w="2500"`), and its table
+ * column-width resolver reads the same number as a percent — so a
+ * percentage is passed as the plain number of percent.
+ *
+ * ⛔ Before 9.9 the library wrote that number as `${n}%` (`w:w="18%"`),
+ * which Word flags and repairs on open, so this passed `String(n * 50)`
+ * through the library's universal-measure branch instead. docx 9.9
+ * resolves every cell width when it builds a table and throws on that
+ * string ("Invalid universal measure '2500'"), which is why
+ * package.json requires docx ^9.9.0.
  */
 function toTableCellWidth(width) {
-    const rawSize = toInt(width.size) ?? 0
-    const t = width.type
-    if (t === 'pct' || t === 'percentage') {
-        return {
-            size: String(rawSize * 50),
-            type: WidthType.PERCENTAGE,
-        }
-    }
     return {
-        size: rawSize,
-        type: toWidthType(t),
+        size: toInt(width.size) ?? 0,
+        type: toWidthType(width.type),
     }
 }
 
