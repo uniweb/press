@@ -133,4 +133,32 @@ describe('parseStyledString', () => {
             ])
         })
     })
+
+    // semantic-parser escapes the text it puts into its strings (since
+    // 2026-10-14), so a run's characters are the decoded string — and a tag
+    // someone TYPED arrives escaped, so it is text, never a mark.
+    describe('text is decoded, and escaped markup stays text', () => {
+        it('decodes the references in a text run', () => {
+            expect(parseStyledString('if a&lt;b then <strong>R&amp;D</strong> &#169;')).toEqual([
+                { type: 'text', content: 'if a<b then ' },
+                { type: 'text', content: 'R&D', bold: true },
+                { type: 'text', content: ' ©' },
+            ])
+        })
+
+        it('reads a typed tag as the text it is', () => {
+            expect(parseStyledString('&lt;b&gt;x&lt;/b&gt;')).toEqual([{ type: 'text', content: '<b>x</b>' }])
+        })
+
+        it('decodes a link label and its href once', () => {
+            expect(parseStyledString('<a href="/a?x=1&amp;y=2">Tom &amp; Jerry</a>')).toEqual([
+                {
+                    type: 'link',
+                    content: 'Tom & Jerry',
+                    href: '/a?x=1&y=2',
+                    parts: [{ type: 'text', content: 'Tom & Jerry' }],
+                },
+            ])
+        })
+    })
 })

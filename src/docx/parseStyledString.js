@@ -48,16 +48,22 @@
  * // ]
  */
 
-// Decode HTML-attribute entities written by sequence.js's escapeAttr().
-// Inverse of the four replacements there. `&amp;` last so a literal
-// `&amp;quot;` round-trips correctly.
-function decodeAttr(s) {
-    return String(s)
-        .replace(/&quot;/g, '"')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&')
+// Decode the references semantic-parser writes. It escapes text (`&`, `<`,
+// `>`) and attribute values (those and `"`), so a run's characters are the
+// decoded string. One pass, so `&amp;lt;` yields `&lt;` rather than `<`.
+// ⛔ Until 2026-10-14 only attributes were decoded: text arrived unescaped, and
+// a literal `<b>` someone typed was read here as bold.
+const REFERENCES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0' }
+
+function decodeReferences(s) {
+    return String(s).replace(/&(#[xX][0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);/g, (match, ref) => {
+        if (ref[0] !== '#') return REFERENCES[ref] ?? match
+        const code = ref[1] === 'x' || ref[1] === 'X' ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10)
+        return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match
+    })
 }
+
+const decodeAttr = decodeReferences
 
 function readAttr(attrs, name) {
     const re = new RegExp(`${name}="([^"]*)"`)
@@ -68,7 +74,7 @@ function readAttr(attrs, name) {
 export function parseStyledString(inputString) {
     const createTextPart = (content, styles) => ({
         type: 'text',
-        content,
+        content: decodeReferences(content),
         ...styles,
     })
 
