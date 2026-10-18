@@ -71,6 +71,14 @@ function readAttr(attrs, name) {
     return m ? decodeAttr(m[1]) : null
 }
 
+// The parser's positional markers — an inset's, an icon's, a picture's
+// (`<uniweb-inset …>`, `<uniweb-icon …>`, `<uniweb-image …>`) — each stand for a
+// component a renderer draws in its place. These builders draw none of them, so
+// a marker is dropped. ⛔ Until 2026-10-18 it was not: the tag pattern below
+// cannot match one (`\w+` stops at the hyphen, and a marker is empty), and it
+// reached the document as its own text.
+const PARSER_MARKER = /<uniweb-[a-z]+\b[^>]*><\/uniweb-[a-z]+>/g
+
 export function parseStyledString(inputString) {
     const createTextPart = (content, styles) => ({
         type: 'text',
@@ -180,5 +188,5 @@ export function parseStyledString(inputString) {
         inputString = String(inputString ?? '')
     }
 
-    return processSegments(inputString)
+    return processSegments(inputString.replace(PARSER_MARKER, ''))
 }
