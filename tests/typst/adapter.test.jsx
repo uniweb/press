@@ -209,6 +209,16 @@ describe('typst adapter: IR → Typst source', () => {
         expect(src).toContain('```py')
         expect(src).toContain('- first')
     })
+
+    it('a code block reaches the document as written — its <, > and & characters included', () => {
+        // The parser hands a code block over as text (semantic-parser, 2026-10-19);
+        // it used to arrive HTML-escaped, so a document printed `&lt;p&gt;` for `<p>`.
+        const src = renderToContentTyp(
+            <Sequence data={[{ type: 'codeBlock', text: '<p>a & b</p>', attrs: { language: 'html' } }]} />,
+        )
+        expect(src).toContain('```html\n<p>a & b</p>\n```')
+        expect(src).not.toContain('&lt;')
+    })
 })
 
 describe('typst adapter: buildBundle', () => {
