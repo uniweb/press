@@ -10,7 +10,7 @@
  *     plumbing in every stage's test.
  *
  *   verifyDocx(buffer)
- *     Asserts the three Word-clean invariants from framework/press/CLAUDE.md
+ *     Asserts the three Word-clean invariants from this package's CLAUDE.md
  *     so any regression on those is loud:
  *       1. Every <wp:docPr> id is unique across the document.
  *       2. Every <wp:docPr> emits a `name=""` attribute.

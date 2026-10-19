@@ -37,7 +37,7 @@ visibly improve on the previous one.
 
 ## What `verifyDocx` checks
 
-The three Word-clean invariants from `framework/press/CLAUDE.md`:
+The three Word-clean invariants from this package's `CLAUDE.md`:
 
 1. Every `<wp:docPr>` `id` is unique across the document.
 2. Every `<wp:docPr>` emits a `name=""` attribute.

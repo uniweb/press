@@ -18,9 +18,9 @@
  * `assets/fetch.js`), and press has — by constitution — no `@uniweb/*`
  * dependency at all. So the declarations are genuinely duplicated here.
  *
- * That duplicate is pinned mechanically rather than by comment:
- * `framework/_contracts/math-css-parity.test.js` recomposes this value from the
- * real `temml` package plus kit's stylesheet and fails when they disagree.
+ * That duplicate is pinned mechanically rather than by comment: a cross-package
+ * test recomposes this value from the real `temml` package plus kit's stylesheet
+ * and fails when they disagree.
  * Regenerate rather than hand-edit `TEMML_BASE`.
  *
  * ── The two deliberate departures from Temml's sheet ──
