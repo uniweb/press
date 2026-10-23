@@ -562,7 +562,7 @@ function blockNodeToLatex(node) {
 // (use \section as the top level there). Foundations targeting an
 // articleclass should override the template — but the IR-level mapping
 // is book-class by default since this adapter ships alongside
-// @uniweb/book.
+// @unipress/book.
 const HEADING_CMD_BY_LEVEL = {
     1: 'chapter',
     2: 'section',
