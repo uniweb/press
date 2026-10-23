@@ -412,8 +412,10 @@ The `<DocumentProvider theme={...}>` carries five things:
 For `unipress` and similar hosts, you don't mount `<DocumentProvider>` yourself — `compileSubtree` does it from the value `getOptions` returns. For an in-page flow (browser-side download button), wrap your tree:
 
 ```jsx
+const blocks = website.pages.flatMap((page) => page.bodyBlocks || [])
+
 <DocumentProvider theme={resolveTheme(cfg)}>
-    <ActivityReport blocks={website.allBlocks} />
+    <ActivityReport blocks={blocks} />
     <DownloadButton />
 </DocumentProvider>
 ```

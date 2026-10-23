@@ -114,7 +114,7 @@ The three shapes above all live inside a single page: one URL, one Download butt
 
 Books are different. A book has one URL per chapter, one chapter per render, and a Download button whose scope is *all chapters*. The compile can't just read the current page's registrations — it needs to walk every page's content, gather every registration, and produce one document.
 
-Press's answer is `compileSubtree`. You hand it a React subtree — typically `<ChildBlocks blocks={website.allBlocks} />` which pulls every block from every page — and it renders the subtree off-screen through its own provider, gathers all registrations, and compiles. No page routing, no DOM mounts. Uniweb's object graph is already populated in memory; walking it is free.
+Press's answer is `compileSubtree`. You hand it a React subtree — typically `<ChildBlocks blocks={website.pages.flatMap((page) => page.bodyBlocks || [])} />`, every block of every page — and it renders the subtree off-screen through its own provider, gathers all registrations, and compiles. No page routing, no DOM mounts. Uniweb's object graph is already populated in memory; walking it is free.
 
 This is the mechanism behind Typst book compilation, and it's how any future "whole-site export" format will work. For a full treatment, see the [book publishing guide](./docs/guides/book-publishing.md).
 

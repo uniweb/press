@@ -115,7 +115,8 @@ For how these shapes interact with preview strategies (same-source JSX vs compil
 The patterns above cover one-page documents. For books — where the download's scope is *every chapter*, not just the current page — Press provides `compileSubtree`:
 
 ```js
-await compileSubtree(<ChildBlocks blocks={website.allBlocks} />, 'typst')
+const blocks = website.pages.flatMap((page) => page.bodyBlocks || [])
+await compileSubtree(<ChildBlocks blocks={blocks} />, 'typst')
 ```
 
 This renders the whole content graph off-screen through its own provider, gathers every registration, and compiles. No page routing, no DOM mounts. See the [book publishing guide](./docs/guides/book-publishing.md) for the end-to-end flow.

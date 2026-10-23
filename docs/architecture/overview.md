@@ -74,7 +74,8 @@ Books broke this model. One URL per chapter, one chapter per render, a Download 
 Press now has a second primitive, `compileSubtree`, which renders any React subtree off-screen through a `DocumentProvider` with an externally-owned store. The canonical book call looks like:
 
 ```js
-await compileSubtree(<ChildBlocks blocks={website.allBlocks} />, 'typst')
+const blocks = website.pages.flatMap((page) => page.bodyBlocks || [])
+await compileSubtree(<ChildBlocks blocks={blocks} />, 'typst')
 ```
 
 That renders every block on every page through `renderToStaticMarkup` into an external store, then compiles. No page routing, no effects, no DOM mounts. Uniweb's object graph — `Website → Page → Block` — is plain JS, already populated, so walking it is free; React is a *transform* over that graph, not a mounting concern.
