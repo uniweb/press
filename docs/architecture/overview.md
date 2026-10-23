@@ -34,7 +34,8 @@ Press is a **registration layer** plus a set of **format adapters**. The registr
                                ▼
                    ┌─────────────────────────────────────┐
                    │ Adapter (lazy-loaded)               │
-                   │  docx.js   typst.js   xlsx.js       │
+                   │  docx.js   typst.js   latex.js      │
+                   │  xlsx.js   pagedjs.js epub.js       │
                    │  (never in the main bundle)         │
                    └───────────┬─────────────────────────┘
                                │
@@ -58,7 +59,7 @@ Several details worth pinning down:
 
 **Registration is synchronous during render**, not in `useEffect`. This matters enough to be a hard constraint. The walker code runs right after React finishes rendering — effects haven't flushed yet — so if registration waited for effects, the compile pipeline would have to wait too, which would force every download flow to be async in a place where it doesn't need to be. More pointedly, it would break `renderToStaticMarkup` + "immediately compile" entirely, which is the mechanism subtree compilation depends on. Registration-during-render is idempotent (same block+format overwrites), so Strict Mode's intentional double-render is harmless.
 
-**The fragment is adapter-specific.** For HTML-based formats (docx, typst, future Paged.js) the fragment is JSX — the walker renders it to HTML and parses to IR. For data-shape formats (xlsx) it's a plain object like `{ title, headers, data }`. For a hypothetical JSON-export adapter it could be any serialisable value. The registration layer has no opinion.
+**The fragment is adapter-specific.** For HTML-based formats the fragment is JSX, rendered to HTML: docx, typst and latex parse that HTML to IR, while pagedjs and epub (which share the `'html'` key) take it as it is. For data-shape formats (xlsx) it's a plain object like `{ title, headers, data }`. For a hypothetical JSON-export adapter it could be any serialisable value. The registration layer has no opinion.
 
 **Roles are the only axis of structure.** `options.role` is `'body'` (default), `'header'`, `'footer'`, or `'metadata'`. Body fragments append to a `sections` array in registration order; header/footer are single (last wins); metadata is a plain pass-through object for document-level properties. Adding a new role is a tiny change in one file.
 
@@ -110,7 +111,7 @@ Both funnel into the same `compileOutputs(store, format)` → adapter dispatch p
 
 Press ships a compact intermediate representation (IR) for HTML-based fragments. The walker `htmlToIR(html)` parses HTML via parse5 and produces a tree of `{ type, ...properties, children? }` nodes. `type` comes from the element's `data-type` attribute (falling back to the tag name); other `data-*` attributes map to properties via a declarative attribute map (`attributeMap` in `ir/attributes.js`).
 
-The IR is a **useful intermediate only when multiple format adapters can consume the same tree** — see [principle 4](./principles.md#4-abstraction-level-is-per-format). Today that includes docx and typst. Both read the IR, dispatch by `type`, and emit format-specific output (docx library calls vs Typst source strings). The upside is concrete: a Press-aware foundation can produce both `.docx` and `.typ` from the same JSX registrations by switching the format string.
+The IR is a **useful intermediate only when multiple format adapters can consume the same tree** — see [principle 4](./principles.md#4-abstraction-level-is-per-format). Today that is docx, typst and latex. Each reads the IR, dispatches by `type`, and emits format-specific output (docx library calls, Typst or LaTeX source strings). The upside is concrete: a Press-aware foundation can produce both `.docx` and `.typ` from the same JSX registrations by switching the format string.
 
 The IR gets in the way when:
 
@@ -122,9 +123,9 @@ For those cases, adapters accept the registered fragment as-is. The `compileOutp
 
 ## Adapter patterns
 
-Two canonical shapes cover most formats Press will want to support.
+Three canonical shapes cover most formats Press will want to support; [adding-a-format.md](./adding-a-format.md) walks through choosing one.
 
-### HTML-based adapters (docx, typst, future Paged.js, future LaTeX)
+### IR-based adapters (docx, typst, latex)
 
 The fragment is JSX emitting semantic HTML with `data-*` attributes. Walker produces IR. Adapter iterates IR nodes, dispatches by `type`, and emits format-native output.
 
@@ -134,9 +135,17 @@ JSX → renderToStaticMarkup → HTML string → htmlToIR → IR tree → adapte
 
 Shared infrastructure that HTML-based adapters reuse:
 
-- `parseStyledString` (inline HTML marks → text runs with style flags + hyperlinks). Lives under `src/docx/` but is format-agnostic — the typst adapter imports it. Will migrate to `src/` when a third adapter picks it up, per [principle 6](./principles.md#6-extract-shared-logic-when-a-second-adapter-needs-it).
-- `resolveUrl` + `BasePathContext` (absolute-URL resolution under subdirectory deployments). Same story — lives in `src/docx/`, imported by typst, promotes to `src/` on third use.
-- `fetchImageData` equivalent (asset-URL → bytes for embedded images). Docx has this in `src/adapters/docx.js`; typst doesn't yet (images are referenced by URL in `#image("url")` and the compiler resolves them at compile time). Paged.js keeps the URL references because the browser does the resolving. When EPUB lands — the next HTML-based adapter that needs embedded assets — the shared extraction happens.
+- `parseStyledString` (inline HTML marks → text runs with style flags + hyperlinks). Lives under `src/docx/` but is format-agnostic — the typst builders import it, and latex re-exports those builders. Will migrate to `src/` when a third adapter picks it up, per [principle 6](./principles.md#6-extract-shared-logic-when-a-second-adapter-needs-it).
+- `resolveUrl` + `BasePathContext` (absolute-URL resolution under subdirectory deployments). `DocumentProvider` supplies the base path; only the docx `Image` builder reads it, since typst and latex bundle their images instead (next item).
+- Asset bytes, in `src/assets/` — extracted when a second adapter needed each, per principle 6. `fetch.js` turns asset URLs into bytes: docx embeds one image at a time, and epub collects every image into its package. `inline-images.js` serves the source-bundle adapters: typst and latex fetch the images in a document's body, write them into the bundle and rewrite each `src` to the bundled path. Paged.js keeps the URL references because the browser does the resolving.
+
+### Rendered-HTML passthrough adapters (pagedjs, epub)
+
+The fragment is JSX, as above, but the adapter skips the IR: each fragment is rendered to an HTML string, and the adapter wraps the strings in the shell its format needs — a paginated HTML document for pagedjs, an EPUB3 package for epub. Both read the fragments registered under `'html'`, so a foundation registers once for the two.
+
+```
+JSX → renderToStaticMarkup → HTML string → adapter wraps the strings
+```
 
 ### Data-shape adapters (xlsx, custom JSON exports)
 
@@ -150,7 +159,7 @@ Useful for formats that aren't rendered documents — spreadsheets, machine-cons
 
 ### Adapter loading
 
-Adapters are reached only through the `ADAPTERS` map in `src/adapters/dispatch.js`, whose entries load each adapter with a dynamic `import()`; `useDocumentCompile` and `compileSubtree` both compile through it. Bundlers emit each adapter as a separate chunk and fetch it on first compile. The adapters directory is **not** in `package.json`'s `exports` field — the only entry points a foundation can import from are the format-agnostic core, the builder subpaths (`/docx`, `/typst`), the section helpers, and the IR utilities. If an adapter ends up in the main bundle via a stray static import, that's a principle-2 violation and a release blocker.
+Adapters are reached only through the `ADAPTERS` map in `src/adapters/dispatch.js`, whose entries load each adapter with a dynamic `import()`; `useDocumentCompile`, `compileSubtree` and `compileDocument` all compile through it. Bundlers emit each adapter as a separate chunk and fetch it on first compile. The adapters directory is **not** in `package.json`'s `exports` field — the only entry points a foundation can import from are the format-agnostic core, the builder subpaths (`/docx`, `/typst`, `/latex`), the formatters (`/format`), the section helpers, the IR utilities, and the dev-only Typst plugin. If an adapter ends up in the main bundle via a stray static import, that's a principle-2 violation and a release blocker.
 
 ## See also
 

@@ -40,7 +40,7 @@ Press runs in the browser. When a format requires a backend — a native compile
 
 ### 4. Abstraction level is per-format
 
-Today, docx and typst both consume the HTML-IR (they are both structured-document formats with rich inline prose, so the shape fits), while xlsx consumes plain data objects (because a spreadsheet is not prose). That is two abstraction levels, not one, and it is deliberate. Slides, EPUB, PDF, and other future targets should choose whatever fits — including forking an existing IR, introducing a new one, or skipping the IR layer and walking JSX directly.
+Today, docx, typst and latex consume the HTML-IR (they are all structured-document formats with rich inline prose, so the shape fits), xlsx consumes plain data objects (because a spreadsheet is not prose), and pagedjs and epub take each fragment's rendered HTML as it is. That is three abstraction levels, not one, and it is deliberate. Slides, EPUB, PDF, and other future targets should choose whatever fits — including forking an existing IR, introducing a new one, or skipping the IR layer and walking JSX directly.
 
 **Why.** Premature IR unification bends the IR to serve multiple masters, produces a shape that serves none of them well, and makes each new format harder to add rather than easier. It is also close to irreversible once adapters start depending on it. The *right* kind of sharing (two genuinely HTML-shaped formats sharing one IR) is fine; the wrong kind (forcing xlsx or slides into the HTML-IR because "we already have one") is the trap this principle guards against.
 

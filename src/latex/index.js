@@ -17,9 +17,9 @@
  *
  * The format adapter (compileLatex, buildBundle) lives at
  * src/adapters/latex.js and is intentionally NOT part of this barrel —
- * adapters are reached only via the dynamic-import inside
- * useDocumentCompile, so importing from '@uniweb/press/latex' does not
- * pull in the adapter or its ZIP helper.
+ * adapters are reached only via the dynamic import in
+ * src/adapters/dispatch.js, so importing from '@uniweb/press/latex' does
+ * not pull in the adapter or its ZIP helper.
  */
 
 export {

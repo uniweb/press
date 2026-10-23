@@ -3,15 +3,18 @@
  *
  * Walks the compile-pipeline output (src/ir/compile.js) — { sections,
  * header, footer, metadata } of IR node arrays — and produces a LaTeX
- * source bundle. Phase 1 ships `sources` mode: return a ZIP Blob of the
- * bundle; the user runs `latexmk -pdf main.tex` (or `pdflatex` /
- * `xelatex` / `lualatex`) locally.
+ * source bundle, in one of two modes:
  *
- * Phase 2 will add `server` mode (POST the bundle to an endpoint that
- * runs a TeX engine and returns a PDF). LaTeX has no realistic WASM
- * path today (TeX-in-browser is heavier and less mature than
- * Typst-in-browser), so the frontend-first story is carried by
- * `sources` mode rather than by in-browser compilation.
+ *   sources (default) — return a ZIP Blob of the bundle; the user runs
+ *     `latexmk -pdf main.tex` (or `pdflatex` / `xelatex` / `lualatex`)
+ *     locally.
+ *   server — POST the bundle to an endpoint that runs a TeX engine and
+ *     returns a PDF (compileServerSide below). No reference endpoint
+ *     ships; the caller supplies one.
+ *
+ * LaTeX has no realistic WASM path today (TeX-in-browser is heavier and
+ * less mature than Typst-in-browser), so the frontend-first story is
+ * carried by `sources` mode rather than by in-browser compilation.
  *
  * Bundle shape (sources mode):
  *

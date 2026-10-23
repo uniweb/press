@@ -124,14 +124,16 @@ This renders the whole content graph off-screen through its own provider, gather
 
 | Entry point | What's in it |
 |---|---|
-| `@uniweb/press` | Core: `DocumentProvider`, `useDocumentOutput`, `useDocumentCompile`, `triggerDownload`, `createStore`, `compileRegistrations`, `compileSubtree` |
+| `@uniweb/press` | Core: `DocumentProvider`, `useDocumentOutput`, `useDocumentCompile`, `triggerDownload`, `createStore`, `compileRegistrations`, `compileSubtree`, `compileDocument`, and the document theme (`useDocumentTheme`, `resolveThemeColor`, `resolveThemeFont`, `DEFAULT_THEME`) |
 | `@uniweb/press/docx` | React builders for docx (`Paragraph`, `TextRun`, `H1`–`H4`, `Image`, `Link`, `List`, …) |
 | `@uniweb/press/typst` | React builders for Typst (`ChapterOpener`, `Heading`, `Paragraph`, `CodeBlock`, `Table`, `BlockQuote`, `Image`, `Asterism`, `Raw`, `Sequence`, …) |
+| `@uniweb/press/latex` | React builders for LaTeX — the `/typst` builders, re-exported — plus `markRawLatex` and the `formatCite` / `formatAutoref` helpers |
+| `@uniweb/press/format` | Locale-aware formatters for the preview and the compiled file alike (`DateText`, `DateRangeText`, `Currency`, `formatters`) |
 | `@uniweb/press/sections` | `Section` and `StandardSection` — register-and-render helpers with their own `<section>` wrapper (for non-Uniweb React contexts) |
 | `@uniweb/press/ir` | IR utilities (`htmlToIR`, `attributeMap`, `compileOutputs`) for custom adapter authors |
 | `@uniweb/press/vite-plugin-typst` | Dev-server Vite plugin answering Typst `server` compile mode locally |
 
-Format adapters themselves (`compileDocx`, `compileTypst`, `compileXlsx`, and the libraries they depend on) are deliberately **not** in the `exports` field. They're reached only through the dynamic `import()` inside `useDocumentCompile`, which keeps multi-megabyte libraries out of the main bundle.
+Format adapters themselves (`compileDocx`, `compileTypst`, `compileXlsx`, and the libraries they depend on) are deliberately **not** in the `exports` field. They're reached only through the dynamic `import()` in the adapter dispatch that `useDocumentCompile`, `compileSubtree` and `compileDocument` share, which keeps multi-megabyte libraries out of the main bundle.
 
 ## Documentation
 
@@ -168,7 +170,7 @@ Format adapters themselves (`compileDocx`, `compileTypst`, `compileXlsx`, and th
 
 ## Status
 
-**Pre-1.0, published on npm.** The registration architecture, builder components, section templates, IR layer, and the docx, typst, and xlsx adapters are stable; the public surface is expected to hold through 1.0.
+**On 1.x, published on npm.** The registration architecture, builder components, section templates, IR layer, and the docx, typst, and xlsx adapters are stable. A change you may need to act on ships as a minor version; fixes and features ship as patches.
 
 Releases go through the workspace publish pipeline. Breaking changes are acceptable when justified, but each release is a published artifact — the `exports` field and documented subpaths stay coherent across versions.
 
