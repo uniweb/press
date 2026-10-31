@@ -17,7 +17,7 @@
  *   - list         { style: 'bullet'|'ordered', children: [...] }
  *   - blockquote   { children: [...] }
  *   - image        { attrs: { url, alt, caption, width } }
- *   - table        { children: [...] }              (future)
+ *   - table        { rows: [{ cells: [{ children, header }] }] }
  *   - inset        { refId }                        (future)
  *   - dataBlock    { ... }                          (skipped — not prose)
  *   - video        { ... }                          (skipped — not in print)
@@ -34,6 +34,21 @@ import List from './List.jsx'
 import BlockQuote from './BlockQuote.jsx'
 import Image from './Image.jsx'
 import Math from './Math.jsx'
+import { Table, Tr, Td } from './Table.jsx'
+
+// `Math` is the builder in this file.
+const Globals = globalThis.Math
+
+// A cell's paragraphs, each strong in a header. Typst and LaTeX tables take the
+// cells as they come, so the mark is what says a row is the header.
+function renderCell(cell, key) {
+    const children = (cell.children || []).map((child) =>
+        child?.type === 'paragraph' && cell.header && child.text
+            ? { ...child, text: `<strong>${child.text}</strong>` }
+            : child,
+    )
+    return <Td key={key}>{children.map((child, i) => renderElement(child, i))}</Td>
+}
 
 function renderElement(element, key) {
     if (!element || typeof element !== 'object') return null
@@ -52,6 +67,21 @@ function renderElement(element, key) {
         case 'paragraph':
             if (!element.text) return null
             return <Paragraph key={key} data={element.text} />
+
+        case 'table': {
+            const rows = element.rows || []
+            if (!rows.length) return null
+            const columns = Globals.max(...rows.map((row) => (row.cells || []).length))
+            return (
+                <Table key={key} columns={columns}>
+                    {rows.map((row, r) => (
+                        <Tr key={r} header={(row.cells || []).every((c) => c.header)}>
+                            {(row.cells || []).map((c, i) => renderCell(c, i))}
+                        </Tr>
+                    ))}
+                </Table>
+            )
+        }
 
         case 'codeBlock':
             return (

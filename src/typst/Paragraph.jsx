@@ -36,6 +36,13 @@ export default function Paragraph({ as: Tag = 'p', data, children, ...props }) {
                             />
                         )
                     }
+                    if (part.type === 'footnote') {
+                        // The adapter reads the note as inline children of the
+                        // footnote, so it is the paragraph's own runs, a level down.
+                        return (
+                            <Paragraph key={i} as="span" data={part.content} data-type="footnote" />
+                        )
+                    }
                     return (
                         <TextRun
                             key={i}

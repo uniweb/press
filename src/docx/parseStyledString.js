@@ -163,6 +163,14 @@ export function parseStyledString(inputString) {
                     lastIndex = offset + match.length
                     return
                 }
+                // A footnote, as an inline atom at its place in the text. The note
+                // rides in an attribute, so a note holding a span of its own does
+                // not close this one early. Its `content` is a styled string too.
+                if (dataType === 'footnote') {
+                    result.push({ type: 'footnote', content: readAttr(attrs, 'data-note') || '' })
+                    lastIndex = offset + match.length
+                    return
+                }
             }
 
             const newStyles = { ...styles }

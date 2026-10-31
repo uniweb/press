@@ -615,6 +615,10 @@ function inlineNodeToLatex(node) {
         return `\\href{${href}}{${inner}}`
     }
 
+    if (node.type === 'footnote') {
+        return `\\footnote{${inlineChildrenToLatex(node.children || [])}}`
+    }
+
     if (node.type === 'math') {
         // LaTeX is its own native math source — pass through verbatim.
         // `$…$` for inline; `\[…\]` for display. The optional `\label{}`

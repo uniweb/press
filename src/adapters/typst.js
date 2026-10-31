@@ -533,6 +533,10 @@ function inlineNodeToTypst(node) {
         return `#link(${quoteTypstString(href)})[${inner}]`
     }
 
+    if (node.type === 'footnote') {
+        return `#footnote[${inlineChildrenToTypst(node.children || [])}]`
+    }
+
     if (node.type === 'math') {
         // Math is delegated to the mitex typst package — foundations
         // import mitex in their preamble. mitex emits typst math

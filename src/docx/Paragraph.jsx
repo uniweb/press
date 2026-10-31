@@ -14,6 +14,7 @@ import { parseStyledString } from './parseStyledString.js'
 import TextRun from './TextRun.jsx'
 import LinkPart from './LinkPart.jsx'
 import Math from './Math.jsx'
+import FootnoteReference from './FootnoteReference.jsx'
 
 /**
  * Build the data-* attribute pairs for paragraph-level Stage-3 props.
@@ -87,6 +88,13 @@ export default function Paragraph({
                                 display={part.display}
                                 id={part.id}
                             />
+                        )
+                    }
+                    if (part.type === 'footnote') {
+                        return (
+                            <FootnoteReference key={i}>
+                                <Paragraph data={part.content} />
+                            </FootnoteReference>
                         )
                     }
                     return (
