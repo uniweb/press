@@ -82,7 +82,7 @@ describe('EPUB pipeline (register → compile → Blob)', () => {
 
         // Spine order matches registration order.
         const spineIds = [...opf.matchAll(/<itemref\s+idref="([^"]+)"/g)].map((m) => m[1])
-        expect(spineIds).toEqual(['ch-01', 'ch-02', 'ch-03'])
+        expect(spineIds).toEqual(['ch-01', 'ch-02', 'ch-03', 'nav'])
 
         // Nav has one link per chapter, carrying the chapter titles.
         const nav = await zip.file('OEBPS/nav.xhtml').async('string')

@@ -130,10 +130,43 @@ describe('compileEpub — manifest/spine consistency', () => {
 
         const manifestIds = [...opf.matchAll(/<item\s+id="([^"]+)"/g)].map((m) => m[1])
         const spineIds = [...opf.matchAll(/<itemref\s+idref="([^"]+)"/g)].map((m) => m[1])
-        expect(spineIds.length).toBe(3)
+        expect(spineIds.filter((id) => id.startsWith('ch-')).length).toBe(3)
         for (const id of spineIds) {
             expect(manifestIds).toContain(id)
         }
+    })
+
+    it('keeps the nav document in the spine, out of the reading flow', async () => {
+        // The landmarks link to nav.xhtml#toc, and EPUBCheck refuses a link to a
+        // resource that is not a spine item (RSC-011).
+        const blob = await compileEpub(
+            { sections: ['<h1>One</h1>'], metadata: { title: 'T', language: 'en' } },
+            { identifier: 'x' },
+        )
+        const zip = await blobToZip(blob)
+        const opf = await zip.file('OEBPS/content.opf').async('string')
+        expect(opf).toMatch(/<itemref\s+idref="nav"\s+linear="no"\/>/)
+    })
+
+    it('says which chapters hold MathML or SVG, and no others', async () => {
+        // EPUBCheck refuses a chapter holding either without the property (OPF-014).
+        const blob = await compileEpub(
+            {
+                sections: [
+                    '<h1>Prose</h1><p>Words.</p>',
+                    '<h1>Maths</h1><p><math><mi>x</mi></math></p>',
+                    '<h1>Drawing</h1><svg viewBox="0 0 1 1"><rect width="1" height="1"></rect></svg>',
+                ],
+                metadata: { title: 'T', language: 'en' },
+            },
+            { identifier: 'x' },
+        )
+        const zip = await blobToZip(blob)
+        const opf = await zip.file('OEBPS/content.opf').async('string')
+        const item = (id) => opf.match(new RegExp(`<item id="${id}"[^>]*>`))[0]
+        expect(item('ch-01')).not.toContain('properties')
+        expect(item('ch-02')).toContain('properties="mathml"')
+        expect(item('ch-03')).toContain('properties="svg"')
     })
 
     it('every chapter referenced in the spine exists in the ZIP', async () => {
@@ -464,6 +497,28 @@ describe('compileEpub — metadata', () => {
         // file: the math base layer is emitted ahead of it.
         expect(css).toContain('.special { color: red; }')
         expect(css.endsWith('.special { color: red; }')).toBe(true)
+    })
+
+    it('leaves out of the math CSS what EPUBCheck refuses', async () => {
+        const blob = await compileEpub(
+            { sections: ['<h1>One</h1>'], metadata: { title: 'T', language: 'en' } },
+            { identifier: 'x' },
+        )
+        const zip = await blobToZip(blob)
+        const css = await zip.file('OEBPS/styles.css').async('string')
+
+        // CSS-001: a reader's own setting, which a book's stylesheet may not state.
+        expect(css).not.toMatch(/\bdirection\s*:/)
+        // CSS-008: its parser stops at `:has()`.
+        expect(css).not.toContain(':has(')
+        // RSC-020: a data: URL has to be a URL, and it keeps drawing what it drew.
+        const urls = [...css.matchAll(/url\("(data:[^"]+)"\)/g)].map((m) => m[1])
+        expect(urls.length).toBeGreaterThan(0)
+        for (const url of urls) {
+            expect(url).not.toMatch(/[<> ]/)
+            expect(url).toContain("marker-end='url(%23a)'")
+            expect(url).toContain("x2='100%25'")
+        }
     })
 
     it('keeps the math CSS when a foundation replaces the stylesheet', async () => {

@@ -31,7 +31,7 @@
 import JSZip from 'jszip'
 import { parseFragment } from 'parse5'
 import { fetchAssets } from '../assets/fetch.js'
-import { MATH_CSS, numberEquations } from './math-css.js'
+import { EPUB_MATH_CSS, numberEquations } from './math-css.js'
 
 // ============================================================================
 // Public API
@@ -70,7 +70,7 @@ export async function compileEpub(input, options = {}) {
     // folding them into DEFAULT_STYLESHEET meant customizing the design
     // silently broke the maths. Emitting first also leaves the foundation's
     // sheet able to override any of it.
-    const css = `${MATH_CSS}\n${stylesheet || DEFAULT_STYLESHEET}`
+    const css = `${EPUB_MATH_CSS}\n${stylesheet || DEFAULT_STYLESHEET}`
     const id = identifier || resolvedMeta.identifier || generateUuid()
     const coverUrl = cover || resolvedMeta.cover || resolvedMeta.coverImage
 
@@ -421,8 +421,14 @@ export function buildOpf({ id, meta, chapters, images, coverImageId, coverPageId
         `    <item id="css" href="styles.css" media-type="text/css"/>`,
     ]
     for (const ch of chapters) {
+        // A chapter says what it holds beyond XHTML — EPUB3 requires it (OPF-014).
+        const held = [
+            /<math[\s>]/.test(ch.xhtml || '') && 'mathml',
+            /<svg[\s>]/.test(ch.xhtml || '') && 'svg',
+        ].filter(Boolean)
+        const props = held.length ? ` properties="${held.join(' ')}"` : ''
         manifestLines.push(
-            `    <item id="${escapeXmlAttr(ch.id)}" href="${escapeXmlAttr(ch.path)}" media-type="application/xhtml+xml"/>`,
+            `    <item id="${escapeXmlAttr(ch.id)}" href="${escapeXmlAttr(ch.path)}" media-type="application/xhtml+xml"${props}/>`,
         )
     }
     for (const img of images) {
@@ -441,6 +447,10 @@ export function buildOpf({ id, meta, chapters, images, coverImageId, coverPageId
             : ` idref="${escapeXmlAttr(ch.id)}"`
         return `    <itemref${attrs}/>`
     })
+    // The landmarks link to the contents in nav.xhtml, and a link must reach a spine
+    // item (RSC-011). `linear="no"` keeps it out of the reading flow: a reader gets
+    // there by "Go to contents", and does not page through it to reach chapter one.
+    spineLines.push(`    <itemref idref="nav" linear="no"/>`)
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id" xml:lang="${escapeXmlAttr(language)}">

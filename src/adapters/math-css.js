@@ -421,6 +421,24 @@ math.tml-display:has(.tml-eqn) {
 export const MATH_CSS = `${TEMML_BASE}\n${UNIWEB_CORRECTIONS}`
 
 /**
+ * The same sheet as an EPUB may carry it. Stores check a book with EPUBCheck and
+ * refuse one it fails, and it fails three things in this sheet:
+ *
+ *   - `direction` (CSS-001): the reader's to set, and a book's stylesheet may not.
+ *   - a `data:` URL with raw `<`, `>` and spaces in it (RSC-020): browsers forgive
+ *     it, and it is not a URL. Encoded it draws the same. The sheet's own escapes
+ *     (`%25`, `%23`) stay as they are, or the SVG would read them as literal text.
+ *   - `:has()` (CSS-008): its parser stops there. That rule only sends an equation's
+ *     tag to the right margin, and a reader without it shows the tag beside the
+ *     formula.
+ *
+ * Derived rather than vendored: `MATH_CSS` is what the parity test pins.
+ */
+export const EPUB_MATH_CSS = MATH_CSS.replace(/^\s*direction:\s*ltr;\n/m, '')
+  .replace(/url\("(data:[^"]+)"\)/g, (_, url) => `url("${url.replace(/[<> ]/g, encodeURIComponent)}")`)
+  .replace(/math\.tml-display:has\(\.tml-eqn\) \{[^}]*\}\n?/, '')
+
+/**
  * Write equation numbers into Temml's tag spans as text.
  *
  * Temml leaves `<span class="tml-eqn"></span>` empty and expects a CSS counter
