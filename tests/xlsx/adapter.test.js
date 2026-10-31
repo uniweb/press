@@ -409,3 +409,41 @@ describe('buildWorkbook: workbook metadata', () => {
         expect(wb.keywords).toBe('publications, metrics')
     })
 })
+
+describe('buildWorkbook: the paper a sheet prints on', () => {
+    const input = {
+        sections: [
+            { title: 'One', headers: ['A'], data: [['x']] },
+            { title: 'Two', headers: ['B'], data: [['y']] },
+        ],
+    }
+
+    it('states it on every sheet', async () => {
+        const letter = await buildWorkbook(input, { paper: 'letter' })
+        expect(letter.worksheets.map((s) => s.pageSetup.paperSize)).toEqual([1, 1])
+        const a4 = await buildWorkbook(input, { paper: 'a4' })
+        expect(a4.worksheets.map((s) => s.pageSetup.paperSize)).toEqual([9, 9])
+    })
+
+    it('states it on the sheet an empty workbook gets, too', async () => {
+        const workbook = await buildWorkbook({ sections: [] }, { paper: 'a4' })
+        expect(workbook.worksheets[0].pageSetup.paperSize).toBe(9)
+    })
+
+    it('reaches the file', async () => {
+        const JSZip = (await import('jszip')).default
+        const blob = await compileXlsx(input, { paper: 'a4' })
+        const zip = await JSZip.loadAsync(await blobToUint8(blob))
+        const xml = await zip.file('xl/worksheets/sheet1.xml').async('string')
+        expect(xml).toMatch(/<pageSetup[^>]*paperSize="9"/)
+    })
+
+    it('leaves it to the printer when none is named', async () => {
+        const workbook = await buildWorkbook(input)
+        expect(workbook.worksheets[0].pageSetup.paperSize).toBeUndefined()
+    })
+
+    it('refuses a paper it cannot state', async () => {
+        await expect(buildWorkbook(input, { paper: 'legal' })).rejects.toThrow(/a4, letter/)
+    })
+})

@@ -39,6 +39,8 @@ import ExcelJS from 'exceljs'
  * @param {string} [options.company]
  * @param {string} [options.description]
  * @param {string[]} [options.keywords]
+ * @param {'a4'|'letter'} [options.paper] - The paper each sheet prints on. Unnamed,
+ *   the file states none and the printer decides.
  * @returns {Promise<Blob>}
  */
 export async function compileXlsx(input, options = {}) {
@@ -61,6 +63,7 @@ export async function compileXlsx(input, options = {}) {
 export async function buildWorkbook(input, options = {}) {
     const { sections = [] } = input
 
+    const paperSize = paperSizeCode(options.paper)
     const workbook = new ExcelJS.Workbook()
 
     if (options.creator) workbook.creator = options.creator
@@ -86,7 +89,25 @@ export async function buildWorkbook(input, options = {}) {
         workbook.addWorksheet('Sheet1')
     }
 
+    if (paperSize !== undefined) {
+        for (const sheet of workbook.worksheets) sheet.pageSetup.paperSize = paperSize
+    }
+
     return workbook
+}
+
+// The spreadsheet format's own codes for a paper (`ST_PaperSize`).
+const PAPER_SIZES = { letter: 1, a4: 9 }
+
+function paperSizeCode(paper) {
+    if (paper === undefined || paper === null) return undefined
+    const code = PAPER_SIZES[paper]
+    if (code === undefined) {
+        throw new Error(
+            `compileXlsx: unknown paper "${paper}". Available: ${Object.keys(PAPER_SIZES).sort().join(', ')}`,
+        )
+    }
+    return code
 }
 
 // ============================================================================
