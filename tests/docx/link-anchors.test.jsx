@@ -90,12 +90,22 @@ describe('in-document anchors', () => {
             expect(documentXml).toMatch(/<w:hyperlink[^>]*r:id=/)
         })
 
+        // External means it has a relationship; an in-document anchor has none.
+        // The address is the relationship's target plus any fragment: docx 9.10
+        // and later keeps the fragment beside the r:id in w:anchor, which is
+        // where Word looks for it, and earlier versions keep it in the target.
         it('leaves a URL that merely carries a fragment external', async () => {
-            const { documentXml } = await compileInvoice(
+            const { documentXml, zip } = await compileInvoice(
                 <Paragraph data='See <a href="https://e.com/page#part">the docs</a>' />,
             )
-            expect(anchorOf(documentXml)).toBeNull()
-            expect(documentXml).toMatch(/<w:hyperlink[^>]*r:id=/)
+            const id = documentXml.match(/<w:hyperlink[^>]*r:id="([^"]*)"/)?.[1]
+            expect(id).toBeDefined()
+
+            const rels = await zip.file('word/_rels/document.xml.rels').async('string')
+            const relationship = rels.match(new RegExp(`<Relationship [^>]*Id="${id}"[^>]*>`))?.[0]
+            const target = relationship?.match(/Target="([^"]*)"/)?.[1]
+            const anchor = anchorOf(documentXml)
+            expect(anchor ? `${target}#${anchor}` : target).toBe('https://e.com/page#part')
         })
     })
 
