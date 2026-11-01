@@ -8,7 +8,7 @@ Most foundation work is covered by the built-in docx adapter plus whatever build
 
 - You want to produce a format whose shape doesn't match docx — Markdown, plain text, RTF, a custom XML, a JSON archive.
 - You want to reuse Press's registration layer (so sections declare their output via `useDocumentOutput` from inside React) but plug in a different compile back-end.
-- You want to produce a format that Press *will* eventually support but doesn't today (e.g., you need xlsx before the built-in adapter lands).
+- You want to produce a format that Press *will* eventually support but doesn't today (e.g., you need slides before a built-in adapter lands).
 
 You do **not** need a custom adapter for:
 
@@ -20,7 +20,7 @@ You do **not** need a custom adapter for:
 Custom adapters come in two flavors:
 
 1. **Application-level.** You're building an app that uses Press and needs to support an extra format. The adapter lives in your own code, not inside Press. You import from `@uniweb/press/ir` to reuse the IR walker and compile helper.
-2. **Inside Press.** You're contributing a new built-in format (e.g., the eventual xlsx or pdf adapter). The adapter lives in `src/adapters/` and is reachable only via `useDocumentCompile`'s dynamic import map.
+2. **Inside Press.** You're contributing a new built-in format (e.g., the eventual slides adapter). The adapter lives in `src/adapters/` and is reachable only via `useDocumentCompile`'s dynamic import map.
 
 This guide covers the application-level case because the contribution path has additional constraints (no entry in `package.json` exports, entry in the `ADAPTERS` map, etc. — all documented in [`CLAUDE.md`](../../CLAUDE.md)).
 

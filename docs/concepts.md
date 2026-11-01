@@ -19,7 +19,7 @@ The core of Press is format-agnostic:
 
 None of these primitives know what `'docx'` means. The `format` argument is an arbitrary string, and the `fragment` can be any shape — JSX, a plain data object, a template string, whatever makes sense for the format you're producing.
 
-Press **ships** a docx toolkit (`@uniweb/press/docx` — React builder components — plus an internal format adapter reached via dynamic import) because docx is the most requested format for reporting use cases. xlsx and pdf toolkits are on the roadmap as additional conveniences. But those are **extras**, not the point. Press is a framework for generating any output format from Uniweb content; the docx toolkit is one implementation of that framework.
+Press **ships** a docx toolkit (`@uniweb/press/docx` — React builder components — plus an internal format adapter reached via dynamic import) because docx is the most requested format for reporting use cases, and adapters for the other formats the [README](../README.md#whats-shipped) lists. But those are **extras**, not the point. Press is a framework for generating any output format from Uniweb content; the docx toolkit is one implementation of that framework.
 
 If you need a format Press doesn't ship — Markdown, RTF, a custom JSON export, a specialized XML — you can write your own adapter today against `@uniweb/press/ir`, register fragments in whatever shape that format needs, and compile them through the same hook and provider. See [Writing a custom adapter](./guides/custom-adapter.md).
 
@@ -245,7 +245,7 @@ Custom adapters written by users of Press can follow the same convention or not 
 | Format | What a section registers | Preview relationship |
 |---|---|---|
 | **docx** (shipped) | JSX with `data-*` attributes. Walked via `renderToStaticMarkup` → `htmlToIR` → `compileDocx`. | Often the same JSX, or Kit-powered preview mirroring the structure. |
-| **xlsx** (roadmap) | A plain `{ title, headers, data }` object. No IR conversion. | Usually different — a chart or interactive table in the preview, flat rows in the sheet. |
+| **xlsx** (shipped) | A plain `{ title, headers, data }` object ([reference](./api/xlsx.md)). No IR conversion. | Usually different — a chart or interactive table in the preview, flat rows in the sheet. |
 | **pdf** (roadmap) | Either docx JSX (via Paged.js) or `@react-pdf/renderer` primitives. | Usually the same as docx for the Paged.js path. |
 
 These are the toolkits Press will ship to make the common cases frictionless. They are **not** a fundamental architectural constraint. Press's registration interface (`useDocumentOutput(block, format, fragment)`) is identical for all formats and for any future format you write an adapter for. The only thing that differs across formats is the shape of `fragment`, because the formats themselves differ — and Press deliberately doesn't force a single IR across them.
