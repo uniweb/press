@@ -51,7 +51,7 @@ See [Foundations + headless hosts](#foundations--headless-hosts) below for how t
 Two shapes:
 
 - **Website mode** — `compileDocument(website, { format, foundation, rootPath?, ...hostHints })`.
-  Gathers blocks (optionally scoped by `rootPath`), uses the foundation's declared outputs, returns a Blob.
+  Gathers blocks (optionally scoped by `rootPath`), uses the foundation's declared outputs, returns a Blob. With no `rootPath` that means every page, so a button on a site of several pages whose download is the page on screen passes `rootPath: page.route`.
 - **Tree mode** — `compileDocument(<tree>, { format, adapterOptions? })`.
   A thin pass-through to `compileSubtree` for callers that assembled the tree themselves. Useful when the block selection policy isn't "every page" — e.g., a range slider that compiles a user-picked subset, or a preview that compiles one section. The outputs lookup is skipped in this mode; the caller supplies adapter options directly.
 
