@@ -137,6 +137,21 @@ describe('parseStyledString', () => {
     // semantic-parser escapes the text it puts into its strings (since
     // 2026-10-14), so a run's characters are the decoded string — and a tag
     // someone TYPED arrives escaped, so it is text, never a mark.
+    describe('inline code', () => {
+        it('is a mark, on its own and with others', () => {
+            expect(parseStyledString('Run <code>uniweb dev</code> now')).toEqual([
+                { type: 'text', content: 'Run ' },
+                { type: 'text', content: 'uniweb dev', code: true },
+                { type: 'text', content: ' now' },
+            ])
+            expect(parseStyledString('<strong><code>x</code></strong>')).toEqual([{ type: 'text', content: 'x', bold: true, code: true }])
+        })
+
+        it('holds a space between two marks as a run of its own', () => {
+            expect(parseStyledString('<strong>a</strong> <code>b</code>').map((p) => p.content)).toEqual(['a', ' ', 'b'])
+        })
+    })
+
     describe('text is decoded, and escaped markup stays text', () => {
         it('decodes the references in a text run', () => {
             expect(parseStyledString('if a&lt;b then <strong>R&amp;D</strong> &#169;')).toEqual([

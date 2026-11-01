@@ -46,6 +46,13 @@ describe('latex adapter: IR → LaTeX source', () => {
         expect(subsub).toContain('\\subsubsection{D}')
     })
 
+    it('keeps the space between two marks, and prints inline code as code', () => {
+        const src = renderToContentTex(
+            <Paragraph data={'<strong>bold</strong> <em>italic</em> and <code>uniweb dev</code> <strong>now</strong>'} />,
+        )
+        expect(src).toContain('\\textbf{bold} \\emph{italic} and \\texttt{uniweb dev} \\textbf{now}')
+    })
+
     it('emits a paragraph as plain text', () => {
         const src = renderToContentTex(<Paragraph>Hello world.</Paragraph>)
         expect(src).toContain('Hello world.')

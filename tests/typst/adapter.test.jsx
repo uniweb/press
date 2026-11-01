@@ -68,6 +68,21 @@ describe('typst adapter: IR → Typst source', () => {
         expect(src).toContain('title: "The Ecosystem"')
     })
 
+    it('keeps the space between two marks, and prints inline code as code', () => {
+        const src = renderToContentTyp(
+            <Paragraph data={'<strong>bold</strong> <em>italic</em> and <code>uniweb dev</code> <strong>now</strong>'} />,
+        )
+        expect(src).toContain('#strong[bold] #emph[italic] and `uniweb dev` #strong[now]')
+    })
+
+    it('keeps it in a heading too', () => {
+        expect(renderToContentTyp(<Heading level={2} data={'<strong>a</strong> <em>b</em>'} />)).toContain('== #strong[a] #emph[b]')
+    })
+
+    it('prints inline code holding a backtick as what it is', () => {
+        expect(renderToContentTyp(<Paragraph data={'<code>a`b</code>'} />)).toContain('#raw("a`b")')
+    })
+
     it('emits a code block with language fence', () => {
         const src = renderToContentTyp(
             <CodeBlock language="jsx">{'const x = 1'}</CodeBlock>,

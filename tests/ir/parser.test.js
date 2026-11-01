@@ -33,6 +33,38 @@ describe('htmlToIR', () => {
         })
     })
 
+    describe('a space between two marks', () => {
+        const runs = (html) => htmlToIR(html)[0].children.map((c) => c.content)
+
+        it('keeps a run that holds only a space', () => {
+            const ir = htmlToIR(
+                '<p data-type="paragraph"><span data-type="text" data-bold="true">bold</span><span data-type="text"> </span><span data-type="text" data-italics="true">italic</span></p>',
+            )
+            expect(ir[0].children).toEqual([
+                { type: 'text', bold: 'true', content: 'bold' },
+                { type: 'text', content: ' ' },
+                { type: 'text', italics: 'true', content: 'italic' },
+            ])
+        })
+
+        it('keeps one written between two inline elements', () => {
+            expect(htmlToIR('<p data-type="paragraph"><a href="/a">a</a> <a href="/b">b</a></p>')[0].children).toEqual([
+                { type: 'a', href: '/a', children: [{ type: 'text', content: 'a' }] },
+                { type: 'text', content: ' ' },
+                { type: 'a', href: '/b', children: [{ type: 'text', content: 'b' }] },
+            ])
+        })
+
+        it('still drops what only lays out the markup', () => {
+            const ir = htmlToIR('<section data-type="section">\n  <p data-type="paragraph">a</p>\n  <p data-type="paragraph">b</p>\n</section>')
+            expect(ir[0].children.map((c) => c.type)).toEqual(['paragraph', 'paragraph'])
+        })
+
+        it('and what opens or closes a line', () => {
+            expect(runs('<p data-type="paragraph">\n  <span data-type="text">a</span>\n</p>')).toEqual(['a'])
+        })
+    })
+
     describe('node type resolution', () => {
         it('uses data-type as the IR type when present', () => {
             const ir = htmlToIR('<div data-type="paragraph">x</div>')

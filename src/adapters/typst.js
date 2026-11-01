@@ -512,7 +512,12 @@ function inlineNodeToTypst(node) {
 
     if (node.type === 'text') {
         let text = escapeTypstInline(node.content || '')
-        if (node.code === 'true') text = '`' + (node.content || '') + '`'
+        // Raw, so the code's own characters print as they are. A backtick would close the markup
+        // form, so that takes the function form.
+        if (node.code === 'true') {
+            const code = node.content || ''
+            text = code.includes('`') ? `#raw(${quoteTypstString(code)})` : '`' + code + '`'
+        }
         // Use the function form `#strong[…]` / `#emph[…]` instead of the
         // markup form `*…*` / `_…_`. Typst's markup-mode marks fail to
         // close when the closing character butts directly against an

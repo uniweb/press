@@ -79,8 +79,7 @@ const SKIP_ELEMENTS = new Set([
 function nodeToIR(node) {
     // Text node — parse5 marks these with nodeName === '#text'.
     if (node.nodeName === '#text') {
-        const content = node.value
-        return content && content.trim() ? { type: 'text', content } : null
+        return node.value ? { type: 'text', content: node.value } : null
     }
 
     // Skip non-element nodes (comments, doctypes, etc.).
@@ -133,9 +132,48 @@ function nodeToIR(node) {
     return obj
 }
 
+// The elements that sit in a line of text.
+const INLINE_ELEMENTS = new Set([
+    'a',
+    'abbr',
+    'b',
+    'cite',
+    'code',
+    'em',
+    'i',
+    'kbd',
+    'mark',
+    'q',
+    's',
+    'small',
+    'span',
+    'strong',
+    'sub',
+    'sup',
+    'u',
+])
+
+const isInline = (node) => INLINE_ELEMENTS.has(node?.tagName?.toLowerCase())
+
+/**
+ * Whether a text node holding only whitespace is part of the text. Between blocks it only lays
+ * out the markup. But `**bold** *italic*` is three runs, and the one in the middle, a lone space,
+ * is what keeps two words apart: it counts inside a run, and between two inline neighbours.
+ * ⛔ Until 2026-11-01 every one was dropped, and that printed `bolditalic`, on every output built
+ * from this tree. A numbered reference printed `[1]R. M. Karp`, and a report `Technical Report388`.
+ *
+ * @param {Object} parent - parse5 node holding the text node
+ * @param {Object[]} siblings - its childNodes
+ * @param {number} at - the text node's place among them
+ */
+function isTextSpace(parent, siblings, at) {
+    return isInline(parent) || getAttr(parent, 'data-type') === 'text' || (isInline(siblings[at - 1]) && isInline(siblings[at + 1]))
+}
+
 /**
  * Walk a parent node's childNodes, converting each to IR and flattening
- * any contentWrapper-spread arrays. Whitespace-only text nodes are dropped.
+ * any contentWrapper-spread arrays. Whitespace-only text nodes that aren't
+ * part of the text are dropped (`isTextSpace`).
  *
  * @param {Object} parent - parse5 element, fragment, or document node
  * @returns {Object[]} Flat array of IR child nodes
@@ -143,7 +181,8 @@ function nodeToIR(node) {
 function collectChildren(parent) {
     const out = []
     const childNodes = parent.childNodes || []
-    for (const child of childNodes) {
+    for (const [at, child] of childNodes.entries()) {
+        if (child.nodeName === '#text' && !child.value.trim() && !isTextSpace(parent, childNodes, at)) continue
         const ir = nodeToIR(child)
         if (ir == null) continue
         if (Array.isArray(ir)) {
