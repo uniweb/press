@@ -91,7 +91,7 @@ Press ships six format adapters today:
 
 - **docx** — Word documents via the [`docx`](https://docx.js.org) library. Paragraphs, headings, text runs, tables, lists, images, hyperlinks, headers/footers, page numbering. The flagship format.
 - **typst** — Typeset PDFs via the [Typst](https://typst.app) compiler. Same-source preview from `/typst` builders; whole-book compile via `compileSubtree`; `sources` mode (pure frontend, user compiles locally) and `server` mode (via a companion endpoint — see [deployment.md](./docs/architecture/deployment.md)).
-- **xlsx** — Spreadsheets via `exceljs`. Plain `{ title, headers, data }` objects, multi-sheet, preview and compiled output independent (because spreadsheets aren't typography). Name the paper its sheets print on with `paper: 'a4' | 'letter'`.
+- **xlsx** — Spreadsheets, written by Press itself with no spreadsheet library behind it. Plain `{ title, headers, data }` objects, multi-sheet, preview and compiled output independent (because spreadsheets aren't typography). Column widths, number formats, totals and the paper its sheets print on are in the [xlsx reference](./docs/api/xlsx.md).
 - **latex** — A LaTeX source bundle (`main.tex` and its parts, zipped) that you compile with `latexmk` or another TeX engine. Its builders at `/latex` are the `/typst` builders, so the same JSX can be registered for both.
 - **pagedjs** — Browser-paginated HTML: [Paged.js](https://pagedjs.org) lays out the pages in a browser tab, and the reader prints to PDF. It reads the fragments a foundation registers under `'html'`.
 - **epub** — Reflowable EPUB3 e-books, from the same `'html'` registrations as pagedjs.

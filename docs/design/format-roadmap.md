@@ -9,7 +9,7 @@
 | Format | Adapter | Input shape | Preview strategy | Deps (lazy) |
 |---|---|---|---|---|
 | docx | `src/adapters/docx.js` | HTML-IR | Same-JSX via `/docx` builders; compiled-blob via `docx-preview` iframe | `docx` (~3.4 MB) |
-| xlsx | `src/adapters/xlsx.js` | Plain `{ title, headers, data }` | Foundation-defined (preview need not match the sheet; charts are a common choice) | `exceljs` |
+| xlsx | `src/adapters/xlsx.js` | Plain `{ title, headers, data }` | Foundation-defined (preview need not match the sheet; charts are a common choice) | `jszip` (the adapter writes the workbook's XML itself) |
 | typst (sources + server) | `src/adapters/typst.js` | HTML-IR | Same-JSX via `/typst` builders; compile-to-PDF via local `typst` CLI or server endpoint | `jszip` (for source bundle) |
 | pagedjs (`html` mode) | `src/adapters/pagedjs.js` | Rendered-HTML passthrough via `consumes: 'html'` | Same-bytes: the HTML Blob opens in a new tab, Paged.js paginates in-browser, user prints to PDF | Paged.js polyfill (CDN, ~100 KB, pinned to 0.4.3) |
 

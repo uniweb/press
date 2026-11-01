@@ -14,7 +14,7 @@ Read the relevant doc for the task before touching code. Do not rely on memory; 
 - **`docs/architecture/word-styles-decision.md`** — why typography routes through OOXML named styles instead of inline formatting. Consult before changing anything in the Stage 6 typography surface.
 - **`docs/concepts.md`** — user-facing mental model. Useful when writing guides or examples.
 - **`docs/guides/docx-foundation-cookbook.md`** — task-oriented walkthrough for foundation authors. The single best document to point a colleague at when they're building a docx-producing foundation. If you're answering a foundation-author question, the answer is probably already in here — quote and link rather than re-deriving.
-- **`docs/api/docx.md`, `format.md`, `typography-roles.md`** — per-subpath API references.
+- **`docs/api/docx.md`, `format.md`, `typography-roles.md`** — per-subpath API references. **`docs/api/xlsx.md`** is the spreadsheet fragment's shape, which has no subpath.
 - **`docs/ai-prompt.md`** — self-contained prompt for asking an LLM for Press JSX. Useful when pair-programming with Claude / Cursor.
 - **`README.md`** — public pitch, hello-world, pointers. Useful for checking how Press is currently presented externally.
 
@@ -197,12 +197,21 @@ Invariant #2 is a footgun specific to `docx@9.x`: `DocProperties({ id })` emits 
 
 Diagnosing future Word-repair complaints: unzip the generated file, have the user open-and-save it in Word, unzip the repaired copy, and `diff -r` the two trees. Whatever Word added (content-type defaults, missing attributes, renamed parts) is what our emitter got wrong.
 
+### xlsx — Excel's strictness is ours
+
+`src/adapters/xlsx.js` writes the workbook's XML itself, with no library between it and Excel, because Press uses a small part of the format: rows, widths, number formats, totals, a header style, metadata and paper. Its header lists the invariants a file must keep to open without a repair prompt, and every one has a test that was seen to fail with the guard removed.
+
+Excel reports all of them with the same sentence, and nothing here throws, so:
+
+- **Tests read the compiled file**, through `tests/xlsx/_read.js`, whose strict XML parser fails on a part that isn't well-formed.
+- **A change to what the adapter writes gets opened in Excel**, because schema-order and value errors only show there. Excel's `string value` for a cell also shows `#####` when a column is too narrow, which no reading of the XML will.
+- **Don't reach for a library when the format grows a little.** A new hint is usually a few lines in `cellXml` or `Styles`. If Press ever needs charts or images in a sheet, that is the time to compare libraries again, and the adapter being internal means foundations would not notice the swap.
+
 ## Dependencies
 
 - `parse5` — HTML parser (testable in Node)
 - `docx` — Word document generation (dynamically imported via `src/adapters/docx.js`, not in the main bundle)
-- `exceljs` — spreadsheet generation (dynamically imported)
-- `jszip` — source-bundle packaging for typst `sources` mode
+- `jszip` — the zip inside xlsx and epub files, and the source bundles for typst `sources` mode and latex (dynamically imported)
 - React 19 as peer dependency
 
 ## Testing

@@ -24,7 +24,7 @@ Every format plugs into the two public hooks — `useDocumentOutput` at render t
 
 ### 2. Adapters are dynamic-imported
 
-Heavy per-format libraries (`docx`, `exceljs`, future `typst.ts`, EPUB writers, PPTX writers) load only when `compile(format)` runs. They are never reachable from a static import graph.
+Heavy per-format libraries (`docx`, `jszip`, future `typst.ts`, PPTX writers) load only when `compile(format)` runs. They are never reachable from a static import graph.
 
 **Why.** Foundations that only use Press's preview side should not pay megabytes for export paths they never trigger. A given user rarely needs more than one or two formats per session. Bundle size is easy to regress on and hard to recover from once users depend on it.
 
