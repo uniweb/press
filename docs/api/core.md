@@ -66,7 +66,7 @@ Arguments:
 
 - **`block`** — the Uniweb runtime's block object, used as the WeakMap key. In non-Uniweb contexts any stable object works (a content object, a section id, a plain `{ id }`). When the block is garbage collected, its registration is cleared automatically.
 - **`format`** — string identifier, e.g. `'docx'`. Not validated against a known list — foundations can register custom formats the core knows nothing about.
-- **`fragment`** — the format-specific payload. JSX for docx; plain objects for xlsx; whatever makes sense for a custom adapter.
+- **`fragment`** — the format-specific payload. JSX for docx; a plain object, or an array of them for several sheets, for xlsx; whatever makes sense for a custom adapter. A block holds one registration per format and role, so a second call replaces the first.
 - **`options`** — optional registration options:
   - **`role`** — `'body'` (default), `'header'`, or `'footer'`. Body entries become the document's main content; header and footer entries map to the docx section header and footer.
   - **`applyTo`** — intent for header/footer entries: `'all'` (default), `'first'`, `'odd'`, or `'even'`. *Currently only `all` and `first` are honored by the docx adapter.*

@@ -170,8 +170,12 @@ function compileHtmlPassthrough(outputs, store) {
 /**
  * Plain-data passthrough (xlsx, future JSON exports). Fragments are not
  * JSX — they're domain objects the adapter defines. Collect in order.
+ *
+ * A fragment may be an array of them: one block has one registration per
+ * format, a second one replacing the first, so that is how a section
+ * contributes several sheets.
  */
 function compileDataPassthrough(outputs) {
-    const sections = outputs.map(({ fragment }) => fragment).filter(Boolean)
+    const sections = outputs.flatMap(({ fragment }) => fragment).filter(Boolean)
     return { sections }
 }

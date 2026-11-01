@@ -8,6 +8,8 @@
  */
 import { describe, it, expect } from 'vitest'
 import { compileXlsx } from '../../src/adapters/xlsx.js'
+import { createStore } from '../../src/DocumentProvider.jsx'
+import { compileOutputs } from '../../src/ir/compile.js'
 import { readXlsx } from './_read.js'
 
 const compile = async (input, options) => readXlsx(await compileXlsx(input, options))
@@ -42,6 +44,48 @@ describe('compileXlsx: end-to-end Blob', () => {
 
 // A reader finds a part through [Content_Types].xml and the relationships. A
 // part they name that is missing, or one with no type, is a damaged package.
+describe('what a section registers', () => {
+    const sheet = (title) => ({ title, headers: ['A'], data: [[title]] })
+    const sheetsOf = async (register) => {
+        const store = createStore()
+        register(store)
+        return (await compile(compileOutputs(store, 'xlsx'))).sheets.map((s) => s.name)
+    }
+
+    it('makes one sheet from one object', async () => {
+        expect(await sheetsOf((store) => store.register({}, 'xlsx', sheet('One')))).toEqual(['One'])
+    })
+
+    it('makes one sheet per object from an array, in its order', async () => {
+        const names = await sheetsOf((store) => store.register({}, 'xlsx', [sheet('Records'), sheet('Summary')]))
+        expect(names).toEqual(['Records', 'Summary'])
+    })
+
+    it('leaves out a null in the array', async () => {
+        const names = await sheetsOf((store) => store.register({}, 'xlsx', [null, sheet('Summary')]))
+        expect(names).toEqual(['Summary'])
+    })
+
+    it("keeps a section's sheets together, among the other sections'", async () => {
+        const names = await sheetsOf((store) => {
+            store.register({}, 'xlsx', sheet('Cover'))
+            store.register({}, 'xlsx', [sheet('Records'), sheet('Summary')])
+            store.register({}, 'xlsx', sheet('Notes'))
+        })
+        expect(names).toEqual(['Cover', 'Records', 'Summary', 'Notes'])
+    })
+
+    // The trap the array exists for: this is what a section gets for two calls.
+    it('replaces the first registration with a second one under the same block', async () => {
+        const block = {}
+        const names = await sheetsOf((store) => {
+            store.register(block, 'xlsx', sheet('Records'))
+            store.register(block, 'xlsx', sheet('Summary'))
+        })
+        expect(names).toEqual(['Summary'])
+    })
+})
+
 describe('the package', () => {
     const input = {
         sections: [

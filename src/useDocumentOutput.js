@@ -19,7 +19,9 @@
  * @param {string} format - Format identifier ('docx', 'xlsx', 'pdf').
  * @param {any} fragment - The format-specific fragment. For docx, this is
  *   JSX that will be statically rendered and parsed to IR. For xlsx, this
- *   is a plain data object like { title, headers, data }.
+ *   is a plain data object like { title, headers, data }, or an array of
+ *   them for several sheets. A block has one registration per format and
+ *   role, so a second call replaces the first rather than adding to it.
  * @param {Object} [options] - Registration options.
  * @param {'header'|'footer'|'body'} [options.role='body'] - Role in the
  *   document (body, header, or footer).

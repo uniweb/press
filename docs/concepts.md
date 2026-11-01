@@ -147,7 +147,7 @@ function PublicationStats({ content, block }) {
     const { data } = content
     const rows = aggregateByYear(data.publications || [])
 
-    // xlsx: flat tabular data, one sheet per block
+    // xlsx: flat tabular data, one object per sheet
     useDocumentOutput(block, 'xlsx', {
         title: 'Publications by year',
         headers: ['Year', 'Count', 'Refereed'],

@@ -1,6 +1,6 @@
 # The `xlsx` fragment
 
-A section registers a spreadsheet as a plain object, one sheet per registration. There is no builder subpath, and no spreadsheet library behind it: Press writes the workbook itself.
+A section registers a spreadsheet as a plain object, one object per sheet. There is no builder subpath, and no spreadsheet library behind it: Press writes the workbook itself.
 
 ```jsx
 import { useDocumentOutput } from '@uniweb/press'
@@ -16,6 +16,15 @@ useDocumentOutput(block, 'xlsx', {
 ```
 
 Then `compile('xlsx', options)` returns the workbook as a Blob. Registering `null` leaves the sheet out.
+
+A section with more than one sheet registers them together, as an array, and a `null` in it leaves that sheet out. A block holds one registration per format, so a second `useDocumentOutput(block, 'xlsx', …)` replaces the first:
+
+```jsx
+useDocumentOutput(block, 'xlsx', [
+    { title: 'Records', headers: recordHeaders, data: records },
+    { title: 'Summary', headers: summaryHeaders, data: summary },
+])
+```
 
 ## The sheet
 
