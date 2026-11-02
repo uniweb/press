@@ -39,6 +39,14 @@ import { Table, Tr, Td } from './Table.jsx'
 // `Math` is the builder in this file.
 const Globals = globalThis.Math
 
+// A width on an image in content, as print reads it. A number with no unit is a size on a screen:
+// `{width=1919 height=1143}` holds a picture's place on a web page, and is the file's own pixels.
+// The page decides those here. Only a length with a unit (`50%`, `10cm`) is meant for print.
+// ⛔ Until 2026-11-02 the number was read as points, so that picture drew 1919pt wide, past the edge
+// of any page. A builder called directly still takes a number as points (`<Image width="400">`).
+const SCREEN_SIZE = /^\s*\d*\.?\d+\s*(px)?\s*$/i
+const printWidth = (width) => (width == null || SCREEN_SIZE.test(String(width)) ? undefined : width)
+
 // A cell's paragraphs, each strong in a header. Typst and LaTeX tables take the
 // cells as they come, so the mark is what says a row is the header.
 function renderCell(cell, key) {
@@ -118,7 +126,7 @@ function renderElement(element, key) {
                     src={element.attrs?.url}
                     alt={element.attrs?.alt}
                     caption={element.attrs?.caption}
-                    width={element.attrs?.width}
+                    width={printWidth(element.attrs?.width)}
                     id={element.attrs?.id || undefined}
                 />
             )
