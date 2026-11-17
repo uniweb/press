@@ -28,6 +28,9 @@ export default function Heading({ level = 1, id, data, children, ...props }) {
                             bold={part.bold}
                             italics={part.italics}
                             underline={!!part.underline}
+                            strike={part.strike}
+                            subscript={part.subscript}
+                            superscript={part.superscript}
                             code={part.code}
                         >
                             {part.content}

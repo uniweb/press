@@ -49,6 +49,9 @@ export default function Paragraph({ as: Tag = 'p', data, children, ...props }) {
                             bold={part.bold}
                             italics={part.italics}
                             underline={!!part.underline}
+                            strike={part.strike}
+                            subscript={part.subscript}
+                            superscript={part.superscript}
                             code={part.code}
                         >
                             {part.content}

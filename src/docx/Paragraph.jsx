@@ -103,6 +103,7 @@ export default function Paragraph({
                             bold={part.bold}
                             italics={part.italics}
                             underline={!!part.underline}
+                            strike={part.strike}
                             subscript={part.subscript}
                             superscript={part.superscript}
                         >

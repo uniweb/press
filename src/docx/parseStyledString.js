@@ -1,6 +1,6 @@
 /**
  * Parses a styled string with inline HTML marks (<strong>/<b>, <em>/<i>, <u>,
- * <sub>, <sup>, <code>, <a>, <span data-type="math">) into an array of text / link /
+ * <s>/<del>, <sub>, <sup>, <code>, <a>, <span data-type="math">) into an array of text / link /
  * math part objects with style flags.
  *
  * Ported from legacy report-sdk/src/utils.js:116-186, extended to support
@@ -17,7 +17,7 @@
  * string.
  *
  * @param {string} inputString - HTML string with inline marks.
- * @returns {Array<{type: string, content?: string, bold?: boolean, italics?: boolean, underline?: object, subscript?: boolean, superscript?: boolean, code?: boolean, href?: string, parts?: Array<object>, latex?: string, display?: boolean}>}
+ * @returns {Array<{type: string, content?: string, bold?: boolean, italics?: boolean, underline?: object, strike?: boolean, subscript?: boolean, superscript?: boolean, code?: boolean, href?: string, parts?: Array<object>, latex?: string, display?: boolean}>}
  *
  * @example
  * parseStyledString('Hello <strong>World</strong>')
@@ -177,6 +177,9 @@ export function parseStyledString(inputString) {
             if (tag === 'strong' || tag === 'b') newStyles.bold = true
             if (tag === 'em' || tag === 'i') newStyles.italics = true
             if (tag === 'u') newStyles.underline = {}
+            // Struck text — the parser's <s> (`~~x~~`). ⛔ Until 2026-11-17 it was read as
+            // an unknown tag, and a document printed it as ordinary text.
+            if (tag === 's' || tag === 'del') newStyles.strike = true
             if (tag === 'sub') newStyles.subscript = true
             if (tag === 'sup') newStyles.superscript = true
             if (tag === 'code') newStyles.code = true

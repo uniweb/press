@@ -42,6 +42,7 @@ export default function LinkPart({ part }) {
                     bold={run.bold}
                     italics={run.italics}
                     underline={!!run.underline}
+                    strike={run.strike}
                     subscript={run.subscript}
                     superscript={run.superscript}
                 >

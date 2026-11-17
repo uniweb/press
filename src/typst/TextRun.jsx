@@ -1,14 +1,17 @@
 /**
  * Inline text span. Renders <span data-type="text"> with optional
- * bold/italic/underline/code via data attributes.
+ * bold/italic/underline/strike/subscript/superscript/code via data attributes.
  *
  * Maps to the `text` IR node type → Typst `*bold*`, `_emph_`, `` `raw` ``, etc.
  */
-export default function TextRun({ children, bold, italics, underline, code, style, ...props }) {
+export default function TextRun({ children, bold, italics, underline, strike, subscript, superscript, code, style, ...props }) {
     const dataProps = { 'data-type': 'text' }
     if (bold) dataProps['data-bold'] = 'true'
     if (italics) dataProps['data-italics'] = 'true'
     if (underline) dataProps['data-underline'] = 'true'
+    if (strike) dataProps['data-strike'] = 'true'
+    if (subscript) dataProps['data-subscript'] = 'true'
+    else if (superscript) dataProps['data-superscript'] = 'true'
     if (code) dataProps['data-code'] = 'true'
     if (style) dataProps['data-style'] = style
 

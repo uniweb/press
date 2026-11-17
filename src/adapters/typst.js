@@ -529,6 +529,11 @@ function inlineNodeToTypst(node) {
         if (node.underline && (node.underline === 'true' || typeof node.underline === 'object')) {
             text = `#underline[${text}]`
         }
+        // Struck, subscript and superscript text (`<s>`, `<sub>`, `<sup>`, 2026-11-17) — a CV keeps
+        // CO₂ and m². The IR reads each from its TextRun's data attribute (`attributeMap`).
+        if (node.strike === true || node.strike === 'true') text = `#strike[${text}]`
+        if (node.subScript === true || node.subScript === 'true') text = `#sub[${text}]`
+        else if (node.superScript === true || node.superScript === 'true') text = `#super[${text}]`
         return text
     }
 

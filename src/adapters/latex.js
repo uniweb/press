@@ -603,6 +603,10 @@ function inlineNodeToLatex(node) {
         ) {
             text = `\\underline{${text}}`
         }
+        // Subscript and superscript (`<sub>`, `<sup>`, 2026-11-17): the kernel's own commands, so no
+        // preamble needs a package for them.
+        if (node.subScript === true || node.subScript === 'true') text = `\\textsubscript{${text}}`
+        else if (node.superScript === true || node.superScript === 'true') text = `\\textsuperscript{${text}}`
         return text
     }
 
